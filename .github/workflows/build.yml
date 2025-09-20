@@ -1,6 +1,6 @@
 name: Build nightly images
 on:
-  push:
+  #push: Disable build on push for now
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * 5' # Run every friday at midnight
