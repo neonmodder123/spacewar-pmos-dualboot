@@ -6,7 +6,7 @@ on:
     - cron: '0 2 * * 5' # Run every friday at midnight
 
 env:
-  KERNEL_BRANCH: danila/spacewar-6.17
+  KERNEL_BRANCH: danila/spacewar-testing
 
 jobs:
   build-image:
@@ -89,3 +89,4 @@ jobs:
           name: nothing-spacewar-plasma
           path: out/*-spacewar.img*
           retention-days: 7
+
