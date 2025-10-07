@@ -6,7 +6,7 @@ on:
     - cron: '0 2 * * 5' # Run every friday at midnight
 
 env:
-  KERNEL_BRANCH: danila/spacewar-testing
+  KERNEL_BRANCH: danila/spacewar-6.17
 
 jobs:
   build-image:
