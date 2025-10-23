@@ -1,4 +1,4 @@
-name: Build nightly images (plasma-mobile)
+name: Build weekly images (plasma-mobile)
 on:
   #push: Disable build on push for now
   workflow_dispatch:

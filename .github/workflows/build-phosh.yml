@@ -1,4 +1,4 @@
-name: Build nightly images (phosh)
+name: Build weekly images (phosh)
 on:
   #push: Disable build on push for now
   workflow_dispatch:
