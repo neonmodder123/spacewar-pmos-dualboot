@@ -1,4 +1,4 @@
-name: Build nightly images (gnome-mobile)
+name: Manually build images for testing
 on:
   #push: Disable build on push for now
   workflow_dispatch:
