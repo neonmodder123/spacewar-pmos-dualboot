@@ -1,0 +1,89 @@
+name: Build nightly images (gnome-mobile)
+on:
+  #push: Disable build on push for now
+  workflow_dispatch:
+
+env:
+  KERNEL_BRANCH: fekz115/spacewar-6.17-rebase
+
+jobs:
+  build-image:
+    strategy:
+      matrix:
+        version: ["default"]
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out build configurations
+        uses: actions/checkout@v4
+
+      - name: Configure git
+        run: |
+          git config --global user.email "veythrix@gmail.com"
+          git config --global user.name "Veythrix"
+
+      - name: Substitute placeholders in configs
+        run: |
+          find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
+
+      - name: Install pmbootstrap from git
+        run: |
+          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
+          mkdir -p ~/.local/bin
+          ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
+          pmbootstrap --version
+
+      - name: Set up pmaports
+        run: |
+          echo -e '\n\n' | pmbootstrap init || true
+          cd ~/.local/var/pmbootstrap/cache_git/pmaports
+          git remote add sc7280 https://github.com/mainlining/pmaports.git
+          DEFAULT_BRANCH=danila/spacewar-mr
+          git fetch sc7280 $DEFAULT_BRANCH
+          git reset --hard sc7280/$DEFAULT_BRANCH
+
+      - name: Check kernel branch
+        if: matrix.version == 'default'
+        run: |
+          DEFAULT_BRANCH=fekz115/spacewar-6.17-rebase
+          echo "Default branch is $DEFAULT_BRANCH"
+          echo "KERNEL_BRANCH=$DEFAULT_BRANCH" >> $GITHUB_ENV
+
+      - name: Clone kernel sources
+        run: |
+          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
+
+      - name: Choose nothing-spacewar device in pmbootstrap to build kernel
+        run: |
+          cp nothing-spacewar.cfg ~/.config/pmbootstrap_v3.cfg
+
+      - name: Compile kernel with envkernel
+        run: |
+          cd linux
+          shopt -s expand_aliases
+          source ../pmbootstrap/helpers/envkernel.sh
+          make defconfig spacewar_defconfig
+          make -j$(nproc)
+          pmbootstrap build --envkernel linux-postmarketos-qcom-sc7280
+
+
+      - name: Create artifact directory
+        run: |
+          mkdir out
+
+      - name: Build nothing-spacewar
+        run: |
+          cp nothing-spacewar.cfg ~/.config/pmbootstrap.cfg
+          pmbootstrap install --password 9229
+          pmbootstrap export
+          cp /tmp/postmarketOS-export/boot.img out/boot-nothing-spacewar.img
+          cp /tmp/postmarketOS-export/nothing-spacewar.img out/rootfs-nothing-spacewar.img
+          xz -T0 -9e -v out/rootfs-nothing-spacewar.img
+          echo -e "n\nn\ny\n" | pmbootstrap zap
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nothing-spacewar-gnome
+          path: out/*-spacewar.img*
+          retention-days: 7
