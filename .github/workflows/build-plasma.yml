@@ -46,16 +46,12 @@ jobs:
 
       - name: Set up pmaports and Init pmbootstrap
         run: |
-          # Run a minimal init to set up the work directory structure. 
-          # The '|| true' follows the user's build.sh, anticipating interactive prompts.
+          # Run minimal init, which clones pmaports before erroring out.
+          # The '|| true' is crucial to continue execution after the interactive error.
           echo -e '\n\n' | pmbootstrap init || true
           
-          # EXPLICITLY CLONE pmaports to the expected location. 
-          # This guarantees the directory exists and fixes the "No such file or directory" error.
-          git clone https://gitlab.postmarketos.org/postmarketOS/pmaports.git \
-            ~/.local/var/pmbootstrap/cache_git/pmaports --depth 1
-
-          # Now change directory to perform git manipulation
+          # Now change directory to perform git manipulation on the repository
+          # that was successfully cloned by 'pmbootstrap init'
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
           
           # Perform the git setup exactly as in the user's build.sh
