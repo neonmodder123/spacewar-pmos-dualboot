@@ -46,11 +46,19 @@ jobs:
 
       - name: Set up pmaports and Init pmbootstrap
         run: |
-          # Non-interactive init with default options for CI
-          echo -e 'a\nedge\nplasma-mobile\n\n' | pmbootstrap init || true
+          # Run a minimal init to set up the work directory structure. 
+          # The '|| true' follows the user's build.sh, anticipating interactive prompts.
+          echo -e '\n\n' | pmbootstrap init || true
           
-          # Update pmaports to the correct branch/remote as in your script
+          # EXPLICITLY CLONE pmaports to the expected location. 
+          # This guarantees the directory exists and fixes the "No such file or directory" error.
+          git clone https://gitlab.postmarketos.org/postmarketOS/pmaports.git \
+            ~/.local/var/pmbootstrap/cache_git/pmaports --depth 1
+
+          # Now change directory to perform git manipulation
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
+          
+          # Perform the git setup exactly as in the user's build.sh
           git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
