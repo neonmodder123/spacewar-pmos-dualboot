@@ -44,22 +44,19 @@ jobs:
           export PATH="$PATH:~/.local/bin"
           pmbootstrap --version
 
-      - name: Set up pmaports and Init pmbootstrap
+      - name: Setup pmaports
         run: |
-          # Run minimal init, which clones pmaports before erroring out.
-          # The '|| true' is crucial to continue execution after the interactive error.
-          echo -e '\n\n' | pmbootstrap init || true
+          # Use non-interactive mode to prevent "EOF when reading a line" error
+          # We explicitly set the channel, vendor, and device to avoid user prompts.
+          pmbootstrap init --non-interactive --channel=edge --vendor=nothing --device=spacewar
           
-          # Now change directory to perform git manipulation on the repository
-          # that was successfully cloned by 'pmbootstrap init'
+          # Continue with custom pmaports setup
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          
-          # Perform the git setup exactly as in the user's build.sh
-          git remote add sc7280 https://github.com/mainlining/pmaports.git
+          git remote add sc7280 https://github.com/mainlining/pmaports.git || true
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
-
+          
       # =================================================================
       # --- CRITICAL NEW STEP: Copy local fstab after pmaports reset ---
       # =================================================================
@@ -143,4 +140,5 @@ jobs:
           name: ${{ env.DEVICE_NAME }}-plasma
           path: out/*
           retention-days: 7
+
 
