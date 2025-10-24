@@ -27,7 +27,7 @@ jobs:
         run: |
           # Use the identity from your build script
           git config --global user.email "example@example.com"
-          git config --global user.name "Nonta72"
+          git config --global user.name "neonmodder123"
 
       - name: Substitute placeholders in configs
         run: |
@@ -73,8 +73,10 @@ jobs:
           mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
           
           # 2. Copy the locally checked-out fstab to overwrite the upstream one
+          cd /home/runner/work/nothing-Spacewar-pmos-dualboot/nothing-Spacewar-pmos-dualboot
           cp $DEVICE_PATH/fstab $PMAPORTS_DIR/$DEVICE_PATH/fstab
           echo "Successfully copied custom fstab for pmos_data boot."
+          cd ~/.local/var/pmbootstrap/cache_git/pmaports
         env:
           PMOS_DEVICE_CODENAME: nothing/spacewar # Required for device path construction
       # =================================================================
@@ -141,3 +143,4 @@ jobs:
           name: ${{ env.DEVICE_NAME }}-plasma
           path: out/*
           retention-days: 7
+
