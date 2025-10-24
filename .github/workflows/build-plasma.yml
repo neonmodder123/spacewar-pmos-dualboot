@@ -60,6 +60,21 @@ jobs:
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
 
+      - name: Copy local device files (fstab) to pmaports
+        id: copy_fstab
+        run: |
+          PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
+          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME/etc
+          
+          # Ensure the target directory for fstab exists in the cloned pmaports
+          mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
+          
+          # Use the checked-out file to overwrite the upstream one
+          cp $DEVICE_PATH/fstab $PMAPORTS_DIR/$DEVICE_PATH/fstab
+          echo "Copied custom fstab to pmaports tree."
+        env:
+          PMOS_DEVICE_CODENAME: nothing/spacewar # Set environment variable for use in this specific step
+
       - name: Clone kernel sources
         run: |
           # Clones the specific branch used in your build.sh
