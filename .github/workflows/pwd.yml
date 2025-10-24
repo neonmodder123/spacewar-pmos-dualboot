@@ -1,0 +1,18 @@
+name: pwd tester
+on:
+  workflow_dispatch:
+
+jobs:
+  build-image:
+    strategy:
+      matrix:
+        version: ["default"]
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out build configurations
+        uses: actions/checkout@v4
+
+      - name: pwd
+        run: |
+          pwd
