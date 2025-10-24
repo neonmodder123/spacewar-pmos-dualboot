@@ -46,17 +46,12 @@ jobs:
 
       - name: Setup pmaports
         run: |
-          # Use non-interactive mode to prevent "EOF when reading a line" error
-          # We explicitly set the channel, vendor, and device to avoid user prompts.
-          pmbootstrap init --non-interactive --channel=edge --vendor=nothing --device=spacewar
-          
-          # Continue with custom pmaports setup
+          echo -e '\n\n' | pmbootstrap init || true
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          git remote add sc7280 https://github.com/mainlining/pmaports.git || true
+          git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
-          git reset --hard sc7280/$DEFAULT_BRANCH
-          
+          git reset --hard sc7280/$DEFAULT_BRANCH          
       # =================================================================
       # --- CRITICAL NEW STEP: Copy local fstab after pmaports reset ---
       # =================================================================
@@ -75,7 +70,7 @@ jobs:
           echo "Successfully copied custom fstab for pmos_data boot."
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
         env:
-          PMOS_DEVICE_CODENAME: nothing/spacewar # Required for device path construction
+          PMOS_DEVICE_CODENAME: nothing/Spacewar # Required for device path construction
       # =================================================================
 
       - name: Clone kernel sources
@@ -140,5 +135,6 @@ jobs:
           name: ${{ env.DEVICE_NAME }}-plasma
           path: out/*
           retention-days: 7
+
 
 
