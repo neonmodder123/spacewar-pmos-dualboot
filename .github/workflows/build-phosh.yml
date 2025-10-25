@@ -11,7 +11,7 @@ env:
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   PMBOOTSTRAP_CONFIG: nothing-spacewar-phosh.cfg
-  KERNEL_CONFIG_FRAGMENT: sm7325.config # Changed to sm7325.config
+  KERNEL_CONFIG_FRAGMENT: sm7325.config
 
 jobs:
   build-image:
@@ -116,6 +116,15 @@ jobs:
       - name: Create artifact directory
         run: |
           mkdir out
+
+      # =================================================================
+      # --- NEW STEP: Update package index to resolve dependency issues ---
+      # =================================================================
+      - name: Update package indices
+        run: |
+          echo "Updating package indices to ensure all dependencies are resolved."
+          pmbootstrap update
+      # =================================================================
 
       - name: Build and Export postmarketOS image
         run: |
