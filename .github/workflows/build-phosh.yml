@@ -94,7 +94,7 @@ jobs:
 
       - name: Choose nothing-spacewar device in pmbootstrap to build kernel
         run: |
-          cp -phosh.cfg ~/.config/pmbootstrap_v3.cfg
+          cp nothing-spacewar-phosh.cfg ~/.config/pmbootstrap_v3.cfg
 
       - name: Compile and Package Kernel with envkernel
         run: |
