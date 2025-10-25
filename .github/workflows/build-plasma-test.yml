@@ -1,0 +1,150 @@
+name: Build test images (plasma-mobile)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 5' # Run every friday at 02:00 UTC
+
+env:
+  KERNEL_BRANCH: danila/spacewar-testing
+  # Define variables for consistency and maintainability
+  KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
+  DEVICE_NAME: nothing-spacewar
+  PMBOOTSTRAP_CONFIG: nothing-spacewar-plasma.cfg
+  KERNEL_CONFIG_FRAGMENT: sm7325.config # Changed to sm7325.config
+  # CRITICAL: Define the target partition for the stowaway method
+  STOWAWAY_PARTITION: /dev/sda11
+
+jobs:
+  build-image:
+    strategy:
+      matrix:
+        version: ["default"]
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out build configurations
+        uses: actions/checkout@v4
+
+      - name: Configure git
+        run: |
+          git config --global user.email "example@example.com"
+          git config --global user.name "neonmodder123"
+
+      - name: Substitute placeholders in configs
+        run: |
+          find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
+
+      - name: Install pmbootstrap from git
+        run: |
+          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
+          mkdir -p ~/.local/bin
+          ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
+          export PATH="$PATH:~/.local/bin"
+          pmbootstrap --version
+
+      - name: Setup pmaports
+        run: |
+          echo -e '\n\n' | pmbootstrap init || true
+          cd ~/.local/var/pmbootstrap/cache_git/pmaports
+          git remote add sc7280 https://github.com/mainlining/pmaports.git
+          DEFAULT_BRANCH=danila/spacewar-mr
+          git fetch sc7280 $DEFAULT_BRANCH
+          git reset --hard sc7280/$DEFAULT_BRANCH          
+
+      # --- Copy custom fstab ---
+      - name: Copy custom fstab to pmaports build tree
+        id: copy_fstab
+        run: |
+          PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
+          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME/
+          mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
+          cd /home/runner/work/nothing-Spacewar-pmos-dualboot/nothing-Spacewar-pmos-dualboot
+          cp $DEVICE_PATH/etc/fstab $PMAPORTS_DIR/$DEVICE_PATH/etc/fstab
+          echo "Successfully copied custom fstab for pmos_data boot."
+          cd ~/.local/var/pmbootstrap/cache_git/pmaports
+        env:
+          PMOS_DEVICE_CODENAME: nothing/Spacewar
+
+      - name: Clone kernel sources
+        run: |
+          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
+
+      - name: Prepare Device Configs
+        run: |
+          cp ${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap_v3.cfg
+          cp ${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap.cfg
+          cp ${{ env.KERNEL_CONFIG_FRAGMENT }} linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
+
+      - name: Compile and Package Kernel with envkernel
+        run: |
+          cd linux
+          shopt -s expand_aliases
+          source ../pmbootstrap/helpers/envkernel.sh
+          make defconfig ${{ env.KERNEL_CONFIG_FRAGMENT }}
+          make -j$(nproc)
+          pmbootstrap build --envkernel ${{ env.KERNEL_PACKAGE }}
+
+      - name: Create artifact directory
+        run: |
+          mkdir out
+
+      - name: 🏗️ Build and Export Stowaway Image
+        run: |
+          # 1. Build initial rootfs
+          pmbootstrap install --password 1114
+          
+          # Define paths (Chroot rootfs directory)
+          ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
+          
+          # 2. CRITICAL: Modify deviceinfo for stowaway boot to /dev/sda11
+          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
+          
+          # 3. Disable mounting /boot in fstab (as per stowaway guide)
+          sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
+          
+          # --- Verification Step ---
+          echo "--- Verifying deviceinfo contents ---"
+          cat ${ROOTFS_DIR}etc/deviceinfo
+          echo "-----------------------------------"
+          # -------------------------
+          
+          # 4. Re-install/Re-package to apply the changes to the boot image
+          pmbootstrap install --split
+          
+          # 5. Export the final images
+          pmbootstrap export
+          
+          # Define paths for exported images
+          EXPORT_PATH=~/.local/var/pmbootstrap/cache_export
+          ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
+          BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
+
+          # --- Create pmos.tar Archive ---
+          PMOS_ROOT_DIR=/tmp/PMOS_ROOT
+          mkdir -p ${PMOS_ROOT_DIR}
+          
+          # Mount the images
+          sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
+          sudo mount -o loop $BOOT_IMG_PATH ${PMOS_ROOT_DIR}/boot/
+          
+          # Create the pmos.tar archive (containing all rootfs and boot files)
+          cd ${PMOS_ROOT_DIR}
+          sudo tar -cf /tmp/pmos.tar *
+          
+          # Clean up mounts
+          sudo umount ${PMOS_ROOT_DIR}/boot/
+          sudo umount ${PMOS_ROOT_DIR}
+          
+          # Copy final artifacts to output directory
+          cp /tmp/pmos.tar $PWD/out/pmos.tar
+          cp $BOOT_IMG_PATH $PWD/out/boot.img
+          
+          # Clean up pmbootstrap's state
+          echo -e "n\nn\ny\n" | pmbootstrap zap
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DEVICE_NAME }}-stowaway
+          path: out/*
+          retention-days: 7
