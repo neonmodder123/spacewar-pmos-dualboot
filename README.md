@@ -1,1 +1,1 @@
-STATUS: postmarketOS boots (partially..), just need to fix the postmarketOS debug shell error
+STATUS: postmarketOS boots, just need to fix the postmarketOS debug shell error
