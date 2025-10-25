@@ -9,10 +9,14 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Setup upterm session
-      uses: owenthereal/action-upterm@v1
+      # Use the correct action that accepts the 'ssh_public_key' input.
+      uses: lhotari/action-upterm@v1
       with:
-        # Provide the SSH public key stored in your GitHub repository secrets.
-        ssh-public-key: ${{ secrets.SSH_PUBLIC_KEY }}
+        # The input parameter name is 'ssh_public_key', not 'ssh-public-key'.
+        ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+        # Set to 'false' if you want any user with the SSH command to connect.
+        limit-access-to-actor: false
+        # The default server is fine, no need to specify it.
 
     - name: Echo test
       run: |
