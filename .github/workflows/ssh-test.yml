@@ -8,14 +8,16 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Setup SSH key
+    - name: Setup SSH private key
       uses: webfactory/ssh-agent@v0.9.0
       with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        # Use the name of the secret containing your PRIVATE key
+        ssh-private-key: ${{ secrets.UPTERM_PRIVATE_KEY }}
 
     - name: Setup upterm session
       uses: lhotari/action-upterm@v1
       with:
+        # Fetches the public SSH keys from the GitHub profile of the user
         limit-access-to-actor: true
 
     - name: Echo test
