@@ -52,7 +52,7 @@ jobs:
         id: copy_fstab
         run: |
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
-          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME/
+          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME
           
           # 1. Ensure the target directory exists inside the pmaports clone
           mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
