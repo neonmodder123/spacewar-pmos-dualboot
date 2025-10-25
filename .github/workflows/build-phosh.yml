@@ -9,8 +9,8 @@ env:
   KERNEL_BRANCH: danila/spacewar-testing
   # Define variables for consistency and maintainability
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
-  DEVICE_NAME: 
-  PMBOOTSTRAP_CONFIG: -plasma.cfg
+  DEVICE_NAME: nothing-spacewar
+  PMBOOTSTRAP_CONFIG: nothing-spacewar-phosh.cfg
   KERNEL_CONFIG_FRAGMENT: sm7325.config # Changed to sm7325.config
 
 jobs:
@@ -58,7 +58,7 @@ jobs:
         id: copy_fstab
         run: |
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
-          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME/
+          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME
           
           # 1. Ensure the target directory exists inside the pmaports clone
           mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
