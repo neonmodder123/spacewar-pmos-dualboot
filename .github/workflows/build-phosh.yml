@@ -1,0 +1,150 @@
+name: Build weekly images (phosh)
+on:
+  #push: Disable build on push for now
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * 5' # Run every friday at midnight
+
+env:
+  KERNEL_BRANCH: danila/spacewar-testing
+  # Define variables for consistency and maintainability
+  KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
+  DEVICE_NAME: nothing-spacewar
+  PMBOOTSTRAP_CONFIG: nothing-spacewar-plasma.cfg
+  KERNEL_CONFIG_FRAGMENT: sm7325.config # Changed to sm7325.config
+
+jobs:
+  build-image:
+    strategy:
+      matrix:
+        version: ["default"]
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out build configurations
+        uses: actions/checkout@v4
+
+      - name: Configure git
+        run: |
+          # Use the identity from your build script
+          git config --global user.email "example@example.com"
+          git config --global user.name "neonmodder123"
+
+      - name: Substitute placeholders in configs
+        run: |
+          # Matches the placeholder substitution from your build.sh for HOME and NPROC
+          find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
+
+      - name: Install pmbootstrap from git
+        run: |
+          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
+          mkdir -p ~/.local/bin
+          ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
+          pmbootstrap --version
+
+      - name: Set up pmaports
+        run: |
+          echo -e '\n\n' | pmbootstrap init || true
+          cd ~/.local/var/pmbootstrap/cache_git/pmaports
+          git remote add sc7280 https://github.com/mainlining/pmaports.git
+          DEFAULT_BRANCH=danila/spacewar-mr
+          git fetch sc7280 $DEFAULT_BRANCH
+          git reset --hard sc7280/$DEFAULT_BRANCH
+
+      # =================================================================
+      # --- CRITICAL NEW STEP: Copy local fstab after pmaports reset ---
+      # =================================================================
+      - name: Copy custom fstab to pmaports build tree
+        id: copy_fstab
+        run: |
+          PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
+          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME/
+          
+          # 1. Ensure the target directory exists inside the pmaports clone
+          mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
+          
+          # 2. Copy the locally checked-out fstab to overwrite the upstream one
+          cd /home/runner/work/nothing-Spacewar-pmos-dualboot/nothing-Spacewar-pmos-dualboot
+          cp $DEVICE_PATH/etc/fstab $PMAPORTS_DIR/$DEVICE_PATH/etc/fstab
+          echo "Successfully copied custom fstab for pmos_data boot."
+          cd ~/.local/var/pmbootstrap/cache_git/pmaports
+        env:
+          PMOS_DEVICE_CODENAME: nothing/Spacewar # Required for device path construction
+      # =================================================================
+
+      - name: Check kernel branch
+        if: matrix.version == 'default'
+        run: |
+          DEFAULT_BRANCH=danila/spacewar-testing
+          echo "Default branch is $DEFAULT_BRANCH"
+          echo "KERNEL_BRANCH=$DEFAULT_BRANCH" >> $GITHUB_ENV
+
+      - name: Clone kernel sources
+        run: |
+          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
+
+      - name: Prepare Device Configs
+        run: |
+          # Copy the device config to the pmbootstrap config location for v3 (build) and v2 (install)
+          cp ${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap_v3.cfg
+          cp ${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap.cfg
+          
+          # Copy the kernel config fragment into the linux source tree for 'make defconfig'
+          cp ${{ env.KERNEL_CONFIG_FRAGMENT }} linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
+
+      - name: Choose nothing-spacewar device in pmbootstrap to build kernel
+        run: |
+          cp nothing-spacewar-phosh.cfg ~/.config/pmbootstrap_v3.cfg
+
+      - name: Compile and Package Kernel with envkernel
+        run: |
+          cd linux
+          shopt -s expand_aliases
+          # Source envkernel.sh using the relative path from the 'linux' directory
+          source ../pmbootstrap/helpers/envkernel.sh
+          
+          # --- Kernel Configuration (Mirroring build.sh logic) ---
+          # Use 'make defconfig' with the copied fragment name
+          make defconfig ${{ env.KERNEL_CONFIG_FRAGMENT }}
+          
+          # 2. Compile the kernel binaries
+          make -j$(nproc)
+          
+          # 3. Use pmbootstrap to package the compiled kernel artifacts
+          pmbootstrap build --envkernel ${{ env.KERNEL_PACKAGE }}
+
+      - name: Create artifact directory
+        run: |
+          mkdir out
+
+      - name: Build and Export postmarketOS image
+        run: |
+          # Use pmbootstrap install to build the rootfs
+          pmbootstrap install --password 1114
+          pmbootstrap export
+          
+          # Define paths using environment variables for clarity
+          BOOT_IMG=/tmp/postmarketOS-export/boot.img
+          ROOTFS_IMG=/tmp/postmarketOS-export/${{ env.DEVICE_NAME }}.img
+          OUT_DIR=$PWD/out
+          
+          # Copy and compress artifacts using tar/xz as per your build.sh
+          cp $BOOT_IMG $OUT_DIR/boot-${{ env.DEVICE_NAME }}.img
+          cp $ROOTFS_IMG $OUT_DIR/rootfs-${{ env.DEVICE_NAME }}.img
+          
+          # Create the final compressed tarball using xz compression
+          tar -c -I 'xz -9 -T0' -f $OUT_DIR/Spacewar_pmos.tar.xz $OUT_DIR/rootfs-${{ env.DEVICE_NAME }}.img $OUT_DIR/boot-${{ env.DEVICE_NAME }}.img
+
+          ls
+
+          pwd
+          
+          # Clean up pmbootstrap's state
+          echo -e "n\nn\ny\n" | pmbootstrap zap
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DEVICE_NAME }}-phosh
+          path: out/*
+          retention-days: 7
