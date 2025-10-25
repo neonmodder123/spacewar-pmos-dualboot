@@ -1,15 +1,19 @@
 name: SSH Session Build
 on:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+
     - name: Setup upterm session
       uses: owenthereal/action-upterm@v1
-      
-    - name: echo test
+      with:
+        # Provide the SSH public key stored in your GitHub repository secrets.
+        ssh-public-key: ${{ secrets.SSH_PUBLIC_KEY }}
+
+    - name: Echo test
       run: |
         echo test
-
