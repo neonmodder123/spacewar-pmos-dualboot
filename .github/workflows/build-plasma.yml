@@ -9,7 +9,7 @@ env:
   # Define variables for consistency and maintainability
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
-  PMBOOTSTRAP_CONFIG: nothing-spacewar.cfg
+  PMBOOTSTRAP_CONFIG: nothing-spacewar-plasma.cfg
   KERNEL_CONFIG_FRAGMENT: sm7325.config # Changed to sm7325.config
 
 jobs:
@@ -135,6 +135,7 @@ jobs:
           name: ${{ env.DEVICE_NAME }}-plasma
           path: out/*
           retention-days: 7
+
 
 
 
