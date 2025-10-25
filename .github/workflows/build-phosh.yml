@@ -67,7 +67,7 @@ jobs:
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
           
           # FIX: Calculate the full path using shell variables (correct syntax)
-          PMOS_DEVICE_PATH="device/${{ env.PMOS_VENDOR }}/${{ env.PMOS_CODENAME }}"
+          PMOS_DEVICE_PATH="device/${{ env.PMOS_VENDOR }}/Spacewar"
           DEVICEINFO_PATH="$PMAPORTS_DIR/$PMOS_DEVICE_PATH/deviceinfo"
 
           if [ ! -f "$DEVICEINFO_PATH" ]; then
@@ -78,7 +78,7 @@ jobs:
           fi
 
           # Append the crucial stowaway command line arguments
-          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=/dev/disk/by-partlabel/${{ env.PMOS_ROOT_PARTITION }}\"" >> "$DEVICEINFO_PATH"
+          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=/dev/sda11\"" >> "$DEVICEINFO_PATH"
           echo "Successfully patched deviceinfo for stowaway boot from ${{ env.PMOS_ROOT_PARTITION }}."
       # =================================================================
 
