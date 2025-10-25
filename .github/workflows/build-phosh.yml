@@ -1,24 +1,22 @@
 name: Build weekly images (phosh)
 on:
-  #push: Disable build on push for now
   workflow_dispatch:
   schedule:
     - cron: '0 1 * * 5' # Run every friday at midnight
 
 env:
-  KERNEL_BRANCH: danila/spacewar-testing
   # Define variables for consistency and maintainability
+  KERNEL_BRANCH: danila/spacewar-testing
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
+  PMOS_DEVICE_CODENAME: nothing-spacewar # Used for pmbootstrap device/pathing
   PMBOOTSTRAP_CONFIG: nothing-spacewar-phosh.cfg
   KERNEL_CONFIG_FRAGMENT: sm7325.config
+  # CRITICAL: Define the target partition label for the stowaway method
+  PMOS_ROOT_PARTITION: pmos_data
 
 jobs:
   build-image:
-    strategy:
-      matrix:
-        version: ["default"]
-
     runs-on: ubuntu-latest
     steps:
       - name: Check out build configurations
@@ -26,13 +24,11 @@ jobs:
 
       - name: Configure git
         run: |
-          # Use the identity from your build script
           git config --global user.email "example@example.com"
           git config --global user.name "neonmodder123"
 
       - name: Substitute placeholders in configs
         run: |
-          # Matches the placeholder substitution from your build.sh for HOME and NPROC
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
 
       - name: Install pmbootstrap from git
@@ -52,32 +48,24 @@ jobs:
           git reset --hard sc7280/$DEFAULT_BRANCH
 
       # =================================================================
-      # --- CRITICAL NEW STEP: Copy local fstab after pmaports reset ---
+      # --- CRITICAL: PMOS COMMAND LINE PATCH (Stowaway Fix) ---
+      # This step tells the initramfs to look for the rootfs inside pmos_data.
       # =================================================================
-      - name: Copy custom fstab to pmaports build tree
-        id: copy_fstab
+      - name: Patch PMOS to use Stowaway/Custom Root
         run: |
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
-          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME
-          
-          # 1. Ensure the target directory exists inside the pmaports clone
-          mkdir -p $PMAPORTS_DIR/$DEVICE_PATH/etc
-          
-          # 2. Copy the locally checked-out fstab to overwrite the upstream one
-          cd /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualboot
-          cp $DEVICE_PATH/etc/fstab $PMAPORTS_DIR/$DEVICE_PATH/etc/fstab
-          echo "Successfully copied custom fstab for pmos_data boot."
-          cd ~/.local/var/pmbootstrap/cache_git/pmaports
-        env:
-          PMOS_DEVICE_CODENAME: nothing/Spacewar # Required for device path construction
-      # =================================================================
+          # Dynamically locate the deviceinfo file
+          DEVICEINFO_PATH=$(find $PMAPORTS_DIR/device/ -type f -name 'deviceinfo' -wholename "*/${{ env.PMOS_DEVICE_CODENAME }}/deviceinfo" | head -n 1)
 
-      - name: Check kernel branch
-        if: matrix.version == 'default'
-        run: |
-          DEFAULT_BRANCH=danila/spacewar-testing
-          echo "Default branch is $DEFAULT_BRANCH"
-          echo "KERNEL_BRANCH=$DEFAULT_BRANCH" >> $GITHUB_ENV
+          if [ -z "$DEVICEINFO_PATH" ]; then
+              echo "Error: deviceinfo file not found. Check PMOS_DEVICE_CODENAME."
+              exit 1
+          fi
+
+          # Append the crucial stowaway command line arguments
+          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=/dev/disk/by-partlabel/${{ env.PMOS_ROOT_PARTITION }}\"" >> "$DEVICEINFO_PATH"
+          echo "Successfully patched deviceinfo for stowaway boot from ${{ env.PMOS_ROOT_PARTITION }}."
+      # =================================================================
 
       - name: Clone kernel sources
         run: |
@@ -85,14 +73,13 @@ jobs:
 
       - name: Prepare Device Configs
         run: |
-          # Copy the device config to the pmbootstrap config location for v3 (build) and v2 (install)
           cp ${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap_v3.cfg
           cp ${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap.cfg
           
-          # Copy the kernel config fragment into the linux source tree for 'make defconfig'
+          # Copy the kernel config fragment into the linux source tree
           cp ${{ env.KERNEL_CONFIG_FRAGMENT }} linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
 
-      - name: Choose nothing-spacewar device in pmbootstrap to build kernel
+      - name: Choose device in pmbootstrap
         run: |
           cp nothing-spacewar-phosh.cfg ~/.config/pmbootstrap_v3.cfg
 
@@ -100,12 +87,17 @@ jobs:
         run: |
           cd linux
           shopt -s expand_aliases
-          # Source envkernel.sh using the relative path from the 'linux' directory
           source ../pmbootstrap/helpers/envkernel.sh
           
-          # --- Kernel Configuration (Mirroring build.sh logic) ---
-          # Use 'make defconfig' with the copied fragment name
+          # 1. Generate the initial configuration
           make defconfig ${{ env.KERNEL_CONFIG_FRAGMENT }}
+          
+          # =================================================================
+          # --- CRITICAL KERNEL PATCH INJECTION (Memory Fix) ---
+          # This is mandatory for the kernel to load on the Nothing Phone 1.
+          # =================================================================
+          echo "CONFIG_PHYS_OFFSET=0x0000000080000000" >> .config
+          echo "Injected CONFIG_PHYS_OFFSET patch into kernel .config"
           
           # 2. Compile the kernel binaries
           make -j$(nproc)
@@ -117,14 +109,10 @@ jobs:
         run: |
           mkdir out
 
-      # =================================================================
-      # --- NEW STEP: Update package index to resolve dependency issues ---
-      # =================================================================
       - name: Update package indices
         run: |
           echo "Updating package indices to ensure all dependencies are resolved."
           pmbootstrap update
-      # =================================================================
 
       - name: Build and Export postmarketOS image
         run: |
@@ -137,16 +125,14 @@ jobs:
           ROOTFS_IMG=/tmp/postmarketOS-export/${{ env.DEVICE_NAME }}.img
           OUT_DIR=$PWD/out
           
-          # Copy and compress artifacts using tar/xz as per your build.sh
+          # Copy and compress artifacts
           cp $BOOT_IMG $OUT_DIR/boot-${{ env.DEVICE_NAME }}.img
           cp $ROOTFS_IMG $OUT_DIR/rootfs-${{ env.DEVICE_NAME }}.img
           
           # Create the final compressed tarball using xz compression
           tar -c -I 'xz -9 -T0' -f $OUT_DIR/Spacewar_pmos.tar.xz $OUT_DIR/rootfs-${{ env.DEVICE_NAME }}.img $OUT_DIR/boot-${{ env.DEVICE_NAME }}.img
 
-          ls
-
-          pwd
+          ls -al out
           
           # Clean up pmbootstrap's state
           echo -e "n\nn\ny\n" | pmbootstrap zap
