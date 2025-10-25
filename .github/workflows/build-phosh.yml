@@ -9,8 +9,8 @@ env:
   KERNEL_BRANCH: danila/spacewar-testing
   # Define variables for consistency and maintainability
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
-  DEVICE_NAME: nothing-spacewar
-  PMBOOTSTRAP_CONFIG: nothing-spacewar-plasma.cfg
+  DEVICE_NAME: 
+  PMBOOTSTRAP_CONFIG: -plasma.cfg
   KERNEL_CONFIG_FRAGMENT: sm7325.config # Changed to sm7325.config
 
 jobs:
@@ -64,7 +64,7 @@ jobs:
           mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
           
           # 2. Copy the locally checked-out fstab to overwrite the upstream one
-          cd /home/runner/work/nothing-Spacewar-pmos-dualboot/nothing-Spacewar-pmos-dualboot
+          cd /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualboot
           cp $DEVICE_PATH/etc/fstab $PMAPORTS_DIR/$DEVICE_PATH/etc/fstab
           echo "Successfully copied custom fstab for pmos_data boot."
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
@@ -94,7 +94,7 @@ jobs:
 
       - name: Choose nothing-spacewar device in pmbootstrap to build kernel
         run: |
-          cp nothing-spacewar-phosh.cfg ~/.config/pmbootstrap_v3.cfg
+          cp -phosh.cfg ~/.config/pmbootstrap_v3.cfg
 
       - name: Compile and Package Kernel with envkernel
         run: |
