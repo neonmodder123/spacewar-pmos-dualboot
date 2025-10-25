@@ -63,7 +63,7 @@ jobs:
           fi
 
           # Append the crucial stowaway command line arguments
-          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=/dev/disk/by-partlabel/${{ env.PMOS_ROOT_PARTITION }}\"" >> "$DEVICEINFO_PATH"
+          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=/dev/sda11\"" >> "$DEVICEINFO_PATH"
           echo "Successfully patched deviceinfo for stowaway boot from ${{ env.PMOS_ROOT_PARTITION }}."
       # =================================================================
 
