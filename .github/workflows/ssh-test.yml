@@ -8,16 +8,16 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Setup SSH key
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
     - name: Setup upterm session
-      # Use the correct action that accepts the 'ssh_public_key' input.
       uses: lhotari/action-upterm@v1
       with:
-        # The input parameter name is 'ssh_public_key', not 'ssh-public-key'.
-        ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
-        # Set to 'false' if you want any user with the SSH command to connect.
-        limit-access-to-actor: false
-        # The default server is fine, no need to specify it.
+        limit-access-to-actor: true
 
     - name: Echo test
       run: |
-        echo test
+        echo "The SSH session is active. Check the workflow logs for the SSH command."
