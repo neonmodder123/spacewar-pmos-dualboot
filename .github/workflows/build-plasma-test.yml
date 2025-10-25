@@ -56,7 +56,7 @@ jobs:
         id: copy_fstab
         run: |
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
-          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME/
+          DEVICE_PATH=device/$PMOS_DEVICE_CODENAME
           mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
           cd /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualboot
           cp $DEVICE_PATH/etc/fstab $PMAPORTS_DIR/$DEVICE_PATH/etc/fstab
