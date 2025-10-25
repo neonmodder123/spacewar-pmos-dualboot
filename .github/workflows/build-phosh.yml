@@ -15,9 +15,10 @@ env:
   DEVICE_NAME: nothing-spacewar
   
   # === CRITICAL: Refactored PMOS Path Variables ===
+  # NOTE: PMOS_DEVICE_PATH removed from here to fix YAML error. 
+  # It will be calculated in the run step below.
   PMOS_VENDOR: nothing
   PMOS_CODENAME: spacewar 
-  PMOS_DEVICE_PATH: device/${{ env.PMOS_VENDOR }}/${{ env.PMOS_CODENAME }}
   # ===============================================
   
   PMBOOTSTRAP_CONFIG: nothing-spacewar-phosh.cfg
@@ -59,18 +60,19 @@ jobs:
 
       # =================================================================
       # --- CRITICAL: PMOS COMMAND LINE PATCH (Stowaway Fix) ---
-      # Now uses the explicitly defined PMOS_DEVICE_PATH
+      # Path is calculated here using shell interpolation.
       # =================================================================
       - name: Patch PMOS to use Stowaway/Custom Root
         run: |
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
-          # Use the explicitly constructed path
-          DEVICEINFO_PATH="$PMAPORTS_DIR/${{ env.PMOS_DEVICE_PATH }}/deviceinfo"
+          
+          # FIX: Calculate the full path using shell variables (correct syntax)
+          PMOS_DEVICE_PATH="device/${{ env.PMOS_VENDOR }}/${{ env.PMOS_CODENAME }}"
+          DEVICEINFO_PATH="$PMAPORTS_DIR/$PMOS_DEVICE_PATH/deviceinfo"
 
           if [ ! -f "$DEVICEINFO_PATH" ]; then
               echo "Error: deviceinfo file not found at expected path: $DEVICEINFO_PATH"
-              echo "The directory $PMAPORTS_DIR/${{ env.PMOS_DEVICE_PATH }} must exist."
-              # Output the directory structure for debugging if it fails
+              echo "The directory $PMAPORTS_DIR/$PMOS_DEVICE_PATH must exist."
               ls -R $PMAPORTS_DIR/device || true
               exit 1
           fi
