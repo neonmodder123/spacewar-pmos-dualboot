@@ -57,9 +57,9 @@ jobs:
         run: |
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
           DEVICE_PATH=device/$PMOS_DEVICE_CODENAME
-          mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
+          mkdir -p $PMAPORTS_DIR/$DEVICE_PATH/etc
           cd /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualboot
-          cp -r $DEVICE_PATH/etc/fstab $PMAPORTS_DIR/$DEVICE_PATH/etc/fstab
+          cp $DEVICE_PATH/etc/fstab $PMAPORTS_DIR/$DEVICE_PATH/etc/fstab
           echo "Successfully copied custom fstab for pmos_data boot."
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
         env:
