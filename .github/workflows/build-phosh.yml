@@ -1,5 +1,9 @@
 name: Build weekly images (phosh)
 on:
+  # --- FIX: Added push trigger to run on code changes ---
+  push:
+    branches: [main, master]
+  # -----------------------------------------------------
   workflow_dispatch:
   schedule:
     - cron: '0 1 * * 5' # Run every friday at midnight
@@ -13,7 +17,7 @@ env:
   # === CRITICAL: Refactored PMOS Path Variables ===
   PMOS_VENDOR: nothing
   PMOS_CODENAME: spacewar 
-  PMOS_DEVICE_PATH: device/${{ env.PMOS_VENDOR }}/Spacewar
+  PMOS_DEVICE_PATH: device/${{ env.PMOS_VENDOR }}/${{ env.PMOS_CODENAME }}
   # ===============================================
   
   PMBOOTSTRAP_CONFIG: nothing-spacewar-phosh.cfg
@@ -72,7 +76,7 @@ jobs:
           fi
 
           # Append the crucial stowaway command line arguments
-          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=/dev/sda11\"" >> "$DEVICEINFO_PATH"
+          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=/dev/disk/by-partlabel/${{ env.PMOS_ROOT_PARTITION }}\"" >> "$DEVICEINFO_PATH"
           echo "Successfully patched deviceinfo for stowaway boot from ${{ env.PMOS_ROOT_PARTITION }}."
       # =================================================================
 
