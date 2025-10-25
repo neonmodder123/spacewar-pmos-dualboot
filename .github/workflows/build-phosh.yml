@@ -9,7 +9,13 @@ env:
   KERNEL_BRANCH: danila/spacewar-testing
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
-  PMOS_DEVICE_CODENAME: nothing-spacewar # Used for pmbootstrap device/pathing
+  
+  # === CRITICAL: Refactored PMOS Path Variables ===
+  PMOS_VENDOR: nothing
+  PMOS_CODENAME: spacewar 
+  PMOS_DEVICE_PATH: device/${{ env.PMOS_VENDOR }}/Spacewar
+  # ===============================================
+  
   PMBOOTSTRAP_CONFIG: nothing-spacewar-phosh.cfg
   KERNEL_CONFIG_FRAGMENT: sm7325.config
   # CRITICAL: Define the target partition label for the stowaway method
@@ -49,16 +55,19 @@ jobs:
 
       # =================================================================
       # --- CRITICAL: PMOS COMMAND LINE PATCH (Stowaway Fix) ---
-      # This step tells the initramfs to look for the rootfs inside pmos_data.
+      # Now uses the explicitly defined PMOS_DEVICE_PATH
       # =================================================================
       - name: Patch PMOS to use Stowaway/Custom Root
         run: |
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
-          # Dynamically locate the deviceinfo file
-          DEVICEINFO_PATH=$(find $PMAPORTS_DIR/device/ -type f -name 'deviceinfo' -wholename "*/${{ env.PMOS_DEVICE_CODENAME }}/deviceinfo" | head -n 1)
+          # Use the explicitly constructed path
+          DEVICEINFO_PATH="$PMAPORTS_DIR/${{ env.PMOS_DEVICE_PATH }}/deviceinfo"
 
-          if [ -z "$DEVICEINFO_PATH" ]; then
-              echo "Error: deviceinfo file not found. Check PMOS_DEVICE_CODENAME."
+          if [ ! -f "$DEVICEINFO_PATH" ]; then
+              echo "Error: deviceinfo file not found at expected path: $DEVICEINFO_PATH"
+              echo "The directory $PMAPORTS_DIR/${{ env.PMOS_DEVICE_PATH }} must exist."
+              # Output the directory structure for debugging if it fails
+              ls -R $PMAPORTS_DIR/device || true
               exit 1
           fi
 
