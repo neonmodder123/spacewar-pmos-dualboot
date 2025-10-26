@@ -1,16 +1,17 @@
-name: Build test images (plasma-mobile)
+name: Stowaway Test plasma
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * 5' # Run every Friday at 02:00 UTC
+    - cron: '0 2 * * 5' # Run every friday at midnight
 
 env:
   KERNEL_BRANCH: danila/spacewar-testing
+  # --- NEW ENV VARS FOR STOWAWAY BUILD ---
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
-  PMBOOTSTRAP_CONFIG: nothing-spacewar-plasma.cfg
+  STOWAWAY_PARTITION: /dev/sda11 # Target partition for the rootfs
   KERNEL_CONFIG_FRAGMENT: sc7280.config
-  STOWAWAY_PARTITION: /dev/sda11
+  # ---------------------------------------
 
 jobs:
   build-image:
@@ -23,7 +24,7 @@ jobs:
       - name: 💾 Check out build configurations
         uses: actions/checkout@v4
 
-      # --- Caching Steps for Optimization ---
+      # --- Caching Steps (Recommended for reliability and speed) ---
       - name: 📦 Cache pmbootstrap packages
         uses: actions/cache@v4
         with:
@@ -40,99 +41,103 @@ jobs:
           key: ${{ runner.os }}-kernel-${{ env.KERNEL_PACKAGE }}-${{ env.KERNEL_BRANCH }}-${{ hashFiles(env.KERNEL_CONFIG_FRAGMENT) }}
           restore-keys: |
             ${{ runner.os }}-kernel-${{ env.KERNEL_PACKAGE }}-${{ env.KERNEL_BRANCH }}-
-      # -------------------------------------------------------------
+      # -----------------------------------------------------------
 
-      - name: Setup environment and install pmbootstrap
+      - name: Configure git
         run: |
-          # Git identity (from build.sh)
-          git config --global user.email "example@example.com"
-          git config --global user.name "Nonta72"
+          git config --global user.email "veythrix@gmail.com"
+          git config --global user.name "Veythrix"
 
-          # Replace placeholders in .cfg file (from build.sh)
+      - name: Substitute placeholders in configs
+        run: |
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
 
-          # Install pmbootstrap from Git (from build.sh)
+      - name: Install pmbootstrap from git
+        run: |
           git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
           mkdir -p ~/.local/bin
-          rm -f ~/.local/bin/pmbootstrap
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
           pmbootstrap --version
 
-      - name: Setup pmaports and Kernel Sources
+      - name: Set up pmaports
         run: |
           echo -e '\n\n' | pmbootstrap init || true
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          
-          # Kernel branch setup (from build.sh)
           git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
           
-          # Clone kernel sources
-          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
-
-      - name: 📁 Copy Device Package and Configs
-        run: |
+          # Ensure device package is copied for pmbootstrap to find it
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
           DEVICE_PATH=device/nothing/Spacewar/
-          
-          # Copy Device Package
           mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
           cp -r device/nothing/Spacewar/* $PMAPORTS_DIR/$DEVICE_PATH
-          
-          # Copy config to pmbootstrap
-          cp $PWD/${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap_v3.cfg
-          cp $PWD/${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap.cfg
+
+      - name: Check kernel branch
+        if: matrix.version == 'default'
+        run: |
+          DEFAULT_BRANCH=danila/spacewar-testing
+          echo "Default branch is $DEFAULT_BRANCH"
+          echo "KERNEL_BRANCH=$DEFAULT_BRANCH" >> $GITHUB_ENV
+
+      - name: Clone kernel sources
+        run: |
+          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
+
+      - name: Choose nothing-spacewar device in pmbootstrap to build kernel
+        run: |
+          cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap_v3.cfg
           cp $PWD/${{ env.KERNEL_CONFIG_FRAGMENT }} $PWD/linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
 
-      - name: 💻 Compile and Package Kernel with envkernel
+      - name: Compile kernel with envkernel
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
-          echo "Kernel cache miss. Compiling kernel..."
-          cd $PWD/linux
+          cd linux
           shopt -s expand_aliases
-          source $PWD/pmbootstrap/helpers/envkernel.sh
+          source ../pmbootstrap/helpers/envkernel.sh
           make defconfig ${{ env.KERNEL_CONFIG_FRAGMENT }}
           make -j$(nproc)
           pmbootstrap build --envkernel ${{ env.KERNEL_PACKAGE }}
-        
-      - name: Create artifact directory
-        run: mkdir out
 
-      - name: 🏗️ Build and Export Stowaway Image
+      - name: Create artifact directory
         run: |
-          # 1. Build initial rootfs, piping the password '1114' twice (for verification)
-          echo -e "1114\n1114" | pmbootstrap install
+          mkdir out
+
+      - name: Build nothing-spacewar (Configured for Stowaway)
+        run: |
+          # 1. Build initial rootfs (using your working install logic)
+          cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
+          pmbootstrap install --password 9229
           
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
           
-          # 2. CRITICAL: Modify deviceinfo for stowaway boot to /dev/sda11
+          # 2. CRITICAL: Inject the Stowaway kernel command line argument
           echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
           
-          # 3. Disable mounting /boot in fstab (standard stowaway requirement)
+          # 3. Disable mounting /boot in fstab (prevents chroot conflicts)
           sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
           
           # 4. Re-install/Re-package to apply the changes to the boot image
           pmbootstrap install --split
           
-          # 5. Export the images (which creates the temporary .img files we need)
+          # 5. Export the images
           pmbootstrap export
           
-          # --- Create pmos.tar.xz Archive and Custom Files ---
-          EXPORT_PATH=~/.local/var/pmbootstrap/cache_export
+          # 6. Create final artifacts (Tarball for Stowaway)
+          EXPORT_PATH=/tmp/postmarketOS-export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
-
+          
           PMOS_ROOT_DIR=/tmp/PMOS_ROOT
           mkdir -p ${PMOS_ROOT_DIR}
-          
-          # Mount the rootfs image to access its contents
+
+          # Mount rootfs and create the final compressed archive (tar.xz)
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
           
-          # Compress the entire root filesystem into a tar.xz with xz -9 -T0
           cd ${PMOS_ROOT_DIR}
+          # Create Spacewar_pmos.tar.xz from the contents of the rootfs
           sudo tar -cf $PWD/Spacewar_pmos.tar.xz --use-compress-program='xz -9 -T0' *
           
           sudo umount ${PMOS_ROOT_DIR}
@@ -140,13 +145,14 @@ jobs:
           # Move artifacts to the output directory with the user's requested names
           mv $PWD/Spacewar_pmos.tar.xz $PWD/out/Spacewar_pmos.tar.xz
           cp $BOOT_IMG_PATH $PWD/out/boot-nothing-spacewar.img
-          
-          # Clean up pmbootstrap's state (from build.sh)
+
+          # Cleanup
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
-      - name: ⬆️ Upload artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.DEVICE_NAME }}-stowaway
+          # Only upload the boot image and the tarball
           path: out/*
           retention-days: 7
