@@ -9,7 +9,7 @@ env:
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   STOWAWAY_PARTITION: /dev/sda11
-  KERNEL_CONFIG_FRAGMENT: sm7325.config
+  KERNEL_CONFIG_FRAGMENT: sc7280.config
 
 jobs:
   build-image:
@@ -67,14 +67,11 @@ jobs:
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
           
-          # Ensure device package is copied for pmbootstrap to find it
           DEVICE_SOURCE_DIR="$PWD/device/nothing/Spacewar"
           PMAPORTS_DEVICE_DIR="$PWD/device/nothing/Spacewar"
           
           mkdir -p $PMAPORTS_DEVICE_DIR
-          # Copy files (like deviceinfo)
           find $DEVICE_SOURCE_DIR -maxdepth 1 -type f -exec cp -t $PMAPORTS_DEVICE_DIR {} +
-          # Copy 'etc' directory contents
           if [ -d "$DEVICE_SOURCE_DIR/etc" ]; then
               mkdir -p $PMAPORTS_DEVICE_DIR/etc
               cp -r $DEVICE_SOURCE_DIR/etc/. $PMAPORTS_DEVICE_DIR/etc/
@@ -113,27 +110,28 @@ jobs:
 
       - name: Build nothing-spacewar (Configured for Stowaway)
         run: |
-          # 1. Build initial rootfs (FIXED: Pipe password twice for non-interactive success)
+          # 1. Build initial rootfs
           cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
-          echo -e "9229\n9229" | pmbootstrap install  # <- Initial install is successful
+          echo -e "9229\n9229" | pmbootstrap install
           
+          # CRITICAL FIX: Shutdown all active chroots/mounts from the initial install
+          pmbootstrap shutdown 
+
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
           
-          # 2. CRITICAL: Inject the Stowaway kernel command line argument
+          # 2. Inject the Stowaway kernel command line argument
           echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
           
           # 3. Disable mounting /boot in fstab
           sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
           
-          # 4. Re-install/Re-package to apply the changes to the boot image
-          # FIX: Apply pipe to --split to prevent repeated password failures
+          # 4. Re-install/Re-package (updates the boot.img with new cmdline)
           echo -e "9229\n9229" | pmbootstrap install --split 
           
           # 5. Export the images
           pmbootstrap export
           
-          # ... (rest of the file copying and cleanup logic) ...
-          
+          # 6. Create final artifacts (Tarball for Stowaway)
           EXPORT_PATH=/tmp/postmarketOS-export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
@@ -151,6 +149,7 @@ jobs:
           mv $PWD/Spacewar_pmos.tar.xz $PWD/out/Spacewar_pmos.tar.xz
           cp $BOOT_IMG_PATH $PWD/out/boot-nothing-spacewar.img
 
+          # Final cleanup
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
       - name: Upload artifacts
