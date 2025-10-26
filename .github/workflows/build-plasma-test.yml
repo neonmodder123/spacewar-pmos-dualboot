@@ -97,7 +97,8 @@ jobs:
         
       - name: Skip kernel compilation (Cache Hit)
         if: steps.cache-kernel.outputs.cache-hit == 'true'
-        run: echo "--- KERNEL CACHE HIT: Skipping compilation step! (Instant) ---"
+        run: |
+          echo "--- KERNEL CACHE HIT: Skipping compilation step! (Instant) ---"
 
 # =========================================================
 # JOB 2: IMAGE BUILD (FAST, USES PRE-BUILT KERNEL)
