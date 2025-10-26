@@ -1,4 +1,4 @@
-name: Build Test (plasma-mobile)
+name: Optimized Stowaway Build (Two-Stage)
 on:
   workflow_dispatch:
   schedule:
@@ -10,7 +10,7 @@ env:
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   STOWAWAY_PARTITION: /dev/sda11
-  KERNEL_CONFIG_FRAGMENT: sm7325.config
+  KERNEL_CONFIG_FRAGMENT: sm7325.config  # CORRECT: Using sm7325.config
   PMOS_PASSWORD: 9229
 
 # =========================================================
@@ -23,30 +23,36 @@ jobs:
       - name: 💾 Checkout Code
         uses: actions/checkout@v4
       
-      - name: Substitute placeholders in configs
+      - name: Install pmbootstrap and Configure Git
         run: |
+          # 1. Configure Git and PMOS environment
+          git config --global user.email "veythrix@gmail.com"
+          git config --global user.name "Veythrix"
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
-
-      - name: Install pmbootstrap from git
-        run: |
+          
+          # 2. Install pmbootstrap
           git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
-          pmbootstrap --version
 
       - name: Set up pmaports and Copy Device Package
         run: |
           echo -e '\n\n' | pmbootstrap init || true
+          # Change to the pmaports directory
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
+          
+          # 1. Fetch pmaports branch
           git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
           
-          DEVICE_SOURCE_DIR="$PWD/device/nothing/Spacewar"
+          # 2. Define source directory in the main workspace and target directory in pmaports
+          DEVICE_SOURCE_DIR="$GITHUB_WORKSPACE/device/nothing/Spacewar"
           PMAPORTS_DEVICE_DIR="$PWD/device/nothing/Spacewar"
           
+          # 3. Copy files from original repo directory (using $GITHUB_WORKSPACE)
           mkdir -p $PMAPORTS_DEVICE_DIR
           find $DEVICE_SOURCE_DIR -maxdepth 1 -type f -exec cp -t $PMAPORTS_DEVICE_DIR {} +
           if [ -d "$DEVICE_SOURCE_DIR/etc" ]; then
@@ -54,6 +60,12 @@ jobs:
               cp -r $DEVICE_SOURCE_DIR/etc/. $PMAPORTS_DEVICE_DIR/etc/
           fi
           echo "Successfully copied device package files."
+          
+          # 4. Copy config fragments (Source path confirmed to be $GITHUB_WORKSPACE)
+          cp "$GITHUB_WORKSPACE/${{ env.KERNEL_CONFIG_FRAGMENT }}" "$PWD/linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}"
+          cp "$GITHUB_WORKSPACE/nothing-spacewar-plasma.cfg" ~/.config/pmbootstrap_v3.cfg
+          
+          cd $GITHUB_WORKSPACE # Return to repo root
 
       - name: 📦 Restore ccache and packages
         uses: actions/cache@v4
@@ -75,8 +87,7 @@ jobs:
             ${{ runner.os }}-kernel-stable-v1-${{ env.KERNEL_BRANCH }}-
 
       - name: Clone kernel sources
-        run: |
-          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
+        run: git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
 
       - name: Compile kernel with envkernel
         if: steps.cache-kernel.outputs.cache-hit != 'true'
@@ -85,15 +96,22 @@ jobs:
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
+          
+          # CRITICAL FIX: Explicitly set architecture and cross-compiler for ARM64 target
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-alpine-linux-musl-
+          
+          # This command now correctly uses the sm7325.config fragment
           make defconfig ${{ env.KERNEL_CONFIG_FRAGMENT }}
+          
           make -j$(nproc)
+          
           pmbootstrap build --envkernel ${{ env.KERNEL_PACKAGE }}
           echo "--- KERNEL COMPILATION COMPLETE ---"
         
       - name: Skip kernel compilation (Cache Hit)
         if: steps.cache-kernel.outputs.cache-hit == 'true'
-        run: |
-          echo "--- KERNEL CACHE HIT: Skipping compilation step! (Instant) ---"
+        run: echo "--- KERNEL CACHE HIT: Skipping compilation step! (Instant) ---"
 
 # =========================================================
 # JOB 2: IMAGE BUILD (FAST, USES PRE-BUILT KERNEL)
