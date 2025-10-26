@@ -1,4 +1,4 @@
-name: Stowaway Test plasma
+name: Build weekly images (plasma-mobile)
 on:
   workflow_dispatch:
   schedule:
@@ -6,12 +6,10 @@ on:
 
 env:
   KERNEL_BRANCH: danila/spacewar-testing
-  # --- NEW ENV VARS FOR STOWAWAY BUILD ---
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
-  STOWAWAY_PARTITION: /dev/sda11 # Target partition for the rootfs
-  KERNEL_CONFIG_FRAGMENT: sm7325.config
-  # ---------------------------------------
+  STOWAWAY_PARTITION: /dev/sda11
+  KERNEL_CONFIG_FRAGMENT: sc7280.config
 
 jobs:
   build-image:
@@ -24,7 +22,7 @@ jobs:
       - name: 💾 Check out build configurations
         uses: actions/checkout@v4
 
-      # --- Caching Steps (Recommended for reliability and speed) ---
+      # --- Caching Steps ---
       - name: 📦 Cache pmbootstrap packages
         uses: actions/cache@v4
         with:
@@ -41,12 +39,12 @@ jobs:
           key: ${{ runner.os }}-kernel-${{ env.KERNEL_PACKAGE }}-${{ env.KERNEL_BRANCH }}-${{ hashFiles(env.KERNEL_CONFIG_FRAGMENT) }}
           restore-keys: |
             ${{ runner.os }}-kernel-${{ env.KERNEL_PACKAGE }}-${{ env.KERNEL_BRANCH }}-
-      # -----------------------------------------------------------
+      # ---------------------
 
       - name: Configure git
         run: |
-          git config --global user.email "example@example.com"
-          git config --global user.name "neonmodder123"
+          git config --global user.email "veythrix@gmail.com"
+          git config --global user.name "Veythrix"
 
       - name: Substitute placeholders in configs
         run: |
@@ -60,7 +58,7 @@ jobs:
           export PATH="$PATH:~/.local/bin"
           pmbootstrap --version
 
-      - name: Set up pmaports
+      - name: Set up pmaports and Copy Device Package
         run: |
           echo -e '\n\n' | pmbootstrap init || true
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
@@ -69,11 +67,24 @@ jobs:
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
           
-          # Ensure device package is copied for pmbootstrap to find it
-          PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
-          DEVICE_PATH=device/nothing/Spacewar/
-          mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
-          cp -r device/nothing/Spacewar/* $PMAPORTS_DIR/$DEVICE_PATH
+          # Define paths for clarity
+          DEVICE_SOURCE_DIR="$PWD/device/nothing/Spacewar"
+          PMAPORTS_DEVICE_DIR="$PWD/device/nothing/Spacewar"
+          
+          # Create the target device directory if it doesn't exist
+          mkdir -p $PMAPORTS_DEVICE_DIR
+          
+          # --- FIX FOR COPY ERROR ---
+          # 1. Copy all non-directory files (like deviceinfo, APKBUILD)
+          find $DEVICE_SOURCE_DIR -maxdepth 1 -type f -exec cp -t $PMAPORTS_DEVICE_DIR {} +
+          
+          # 2. Copy the contents of the 'etc' directory
+          if [ -d "$DEVICE_SOURCE_DIR/etc" ]; then
+              mkdir -p $PMAPORTS_DEVICE_DIR/etc
+              cp -r $DEVICE_SOURCE_DIR/etc/. $PMAPORTS_DEVICE_DIR/etc/
+          fi
+          echo "Successfully copied device package files (deviceinfo) and directories (etc/) into pmaports."
+          # --------------------------
 
       - name: Check kernel branch
         if: matrix.version == 'default'
@@ -137,7 +148,6 @@ jobs:
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
           
           cd ${PMOS_ROOT_DIR}
-          # Create Spacewar_pmos.tar.xz from the contents of the rootfs
           sudo tar -cf $PWD/Spacewar_pmos.tar.xz --use-compress-program='xz -9 -T0' *
           
           sudo umount ${PMOS_ROOT_DIR}
@@ -153,6 +163,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.DEVICE_NAME }}-stowaway
-          # Only upload the boot image and the tarball
           path: out/*
           retention-days: 7
