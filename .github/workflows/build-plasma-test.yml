@@ -1,4 +1,4 @@
-name: Stowaway Test (plasma-mobile)
+name: Build weekly images (plasma-mobile)
 on:
   workflow_dispatch:
   schedule:
@@ -6,12 +6,10 @@ on:
 
 env:
   KERNEL_BRANCH: danila/spacewar-testing
-  # --- NEW ENV VARS FOR STOWAWAY BUILD ---
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
-  STOWAWAY_PARTITION: /dev/sda11 # Target partition for the rootfs
-  KERNEL_CONFIG_FRAGMENT: sm7325.config # CORRECTED from sc7280.config
-  # ---------------------------------------
+  STOWAWAY_PARTITION: /dev/sda11
+  KERNEL_CONFIG_FRAGMENT: sc7280.config
 
 jobs:
   build-image:
@@ -70,25 +68,18 @@ jobs:
           git reset --hard sc7280/$DEFAULT_BRANCH
           
           # Ensure device package is copied for pmbootstrap to find it
-          PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
-          DEVICE_PATH=device/nothing/Spacewar/
-          mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
-          
           DEVICE_SOURCE_DIR="$PWD/device/nothing/Spacewar"
           PMAPORTS_DEVICE_DIR="$PWD/device/nothing/Spacewar"
           
-          # Create the target device directory if it doesn't exist
           mkdir -p $PMAPORTS_DEVICE_DIR
-          
-          # 1. Copy all non-directory files (like deviceinfo, APKBUILD)
+          # Copy files (like deviceinfo)
           find $DEVICE_SOURCE_DIR -maxdepth 1 -type f -exec cp -t $PMAPORTS_DEVICE_DIR {} +
-          
-          # 2. Copy the contents of the 'etc' directory
+          # Copy 'etc' directory contents
           if [ -d "$DEVICE_SOURCE_DIR/etc" ]; then
               mkdir -p $PMAPORTS_DEVICE_DIR/etc
               cp -r $DEVICE_SOURCE_DIR/etc/. $PMAPORTS_DEVICE_DIR/etc/
           fi
-          echo "Successfully copied device package files (deviceinfo) and directories (etc/) into pmaports."
+          echo "Successfully copied device package files."
 
       - name: Check kernel branch
         if: matrix.version == 'default'
@@ -104,7 +95,6 @@ jobs:
       - name: Choose nothing-spacewar device in pmbootstrap to build kernel
         run: |
           cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap_v3.cfg
-          # Use the corrected sm7325.config
           cp $PWD/${{ env.KERNEL_CONFIG_FRAGMENT }} $PWD/linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
 
       - name: Compile kernel with envkernel
@@ -113,7 +103,6 @@ jobs:
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
-          # Use the corrected sm7325.config
           make defconfig ${{ env.KERNEL_CONFIG_FRAGMENT }}
           make -j$(nproc)
           pmbootstrap build --envkernel ${{ env.KERNEL_PACKAGE }}
@@ -124,16 +113,16 @@ jobs:
 
       - name: Build nothing-spacewar (Configured for Stowaway)
         run: |
-          # 1. Build initial rootfs (using your working install logic)
+          # 1. Build initial rootfs (FIXED: Pipe password twice for non-interactive success)
           cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
-          pmbootstrap install --password 9229
+          echo -e "9229\n9229" | pmbootstrap install
           
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
           
           # 2. CRITICAL: Inject the Stowaway kernel command line argument
           echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
           
-          # 3. Disable mounting /boot in fstab (prevents chroot conflicts)
+          # 3. Disable mounting /boot in fstab
           sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
           
           # 4. Re-install/Re-package to apply the changes to the boot image
@@ -158,7 +147,7 @@ jobs:
           
           sudo umount ${PMOS_ROOT_DIR}
           
-          # Move artifacts to the output directory with the user's requested names
+          # Move artifacts to the output directory
           mv $PWD/Spacewar_pmos.tar.xz $PWD/out/Spacewar_pmos.tar.xz
           cp $BOOT_IMG_PATH $PWD/out/boot-nothing-spacewar.img
 
