@@ -1,4 +1,4 @@
-name: Build test (plasma-mobile)
+name: Optimized Stowaway Build (Two-Stage)
 on:
   workflow_dispatch:
   schedule:
@@ -10,7 +10,7 @@ env:
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   STOWAWAY_PARTITION: /dev/sda11
-  KERNEL_CONFIG_FRAGMENT: sm7325.config
+  KERNEL_CONFIG_FRAGMENT: sc7280.config
   PMOS_PASSWORD: 9229
 
 # =========================================================
@@ -20,12 +20,12 @@ jobs:
   build-kernel:
     runs-on: ubuntu-latest
     steps:
-      - name: 💾 Checkout and Setup (Common steps)
+      - name: 💾 Checkout Code
         uses: actions/checkout@v4
       
-      - name: Install pmbootstrap and Setup pmaports
+      - name: Install pmbootstrap and Configure Git
         run: |
-          # 1. Configure Git and Path
+          # 1. Configure Git and PMOS environment
           git config --global user.email "veythrix@gmail.com"
           git config --global user.name "Veythrix"
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
@@ -35,30 +35,37 @@ jobs:
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
-          
-          # 3. Setup pmaports and copy device package
+
+      - name: Set up pmaports and Copy Device Package
+        run: |
           echo -e '\n\n' | pmbootstrap init || true
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
+          
+          # 1. Fetch pmaports branch
           git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
           
+          # 2. Define source directory in the main workspace and target directory in pmaports
           DEVICE_SOURCE_DIR="$GITHUB_WORKSPACE/device/nothing/Spacewar"
           PMAPORTS_DEVICE_DIR="$PWD/device/nothing/Spacewar"
           
+          # 3. Copy files from original repo directory (outside of current $PWD)
           mkdir -p $PMAPORTS_DEVICE_DIR
           find $DEVICE_SOURCE_DIR -maxdepth 1 -type f -exec cp -t $PMAPORTS_DEVICE_DIR {} +
           if [ -d "$DEVICE_SOURCE_DIR/etc" ]; then
               mkdir -p $PMAPORTS_DEVICE_DIR/etc
               cp -r $DEVICE_SOURCE_DIR/etc/. $PMAPORTS_DEVICE_DIR/etc/
           fi
+          echo "Successfully copied device package files."
           
-          # 4. Copy necessary kernel configs
+          # 4. Copy config fragments
           cp $GITHUB_WORKSPACE/${{ env.KERNEL_CONFIG_FRAGMENT }} $PWD/linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
           cp $GITHUB_WORKSPACE/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap_v3.cfg
-          cd $GITHUB_WORKSPACE # Return to repo root
           
+          cd $GITHUB_WORKSPACE # Return to repo root
+
       - name: 📦 Restore ccache and packages
         uses: actions/cache@v4
         with:
@@ -73,15 +80,14 @@ jobs:
         uses: actions/cache@v4
         id: cache-kernel
         with:
-          # Caches the final, packaged .apk file
           path: ~/.local/var/pmbootstrap/packages/main/${{ env.KERNEL_PACKAGE }}*/*.apk
-          # Stable key based ONLY on kernel sources and config hash
           key: ${{ runner.os }}-kernel-stable-v1-${{ env.KERNEL_BRANCH }}-${{ hashFiles(env.KERNEL_CONFIG_FRAGMENT) }}
           restore-keys: |
             ${{ runner.os }}-kernel-stable-v1-${{ env.KERNEL_BRANCH }}-
 
       - name: Clone kernel sources
-        run: git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
+        run: |
+          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
 
       - name: Compile kernel with envkernel
         if: steps.cache-kernel.outputs.cache-hit != 'true'
@@ -107,7 +113,7 @@ jobs:
     needs: build-kernel
     runs-on: ubuntu-latest
     steps:
-      - name: 💾 Checkout and Setup
+      - name: 💾 Checkout Code
         uses: actions/checkout@v4
         
       - name: Install pmbootstrap and Init
@@ -116,7 +122,6 @@ jobs:
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
-          # Init needs to run before cache restore
           echo -e '\n\n' | pmbootstrap init || true
 
       - name: 📦 Restore Kernel APK (Instant Load)
