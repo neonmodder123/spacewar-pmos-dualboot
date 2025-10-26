@@ -1,4 +1,4 @@
-name: Build test (plasma-mobile)
+name: Build test images (plasma-mobile)
 on:
   workflow_dispatch:
   schedule:
@@ -9,11 +9,8 @@ env:
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   PMBOOTSTRAP_CONFIG: nothing-spacewar-plasma.cfg
-  KERNEL_CONFIG_FRAGMENT: sm7325.config
+  KERNEL_CONFIG_FRAGMENT: sc7280.config
   STOWAWAY_PARTITION: /dev/sda11
-  # CRITICAL FIX: Pre-generated SHA512 hash for the password '1114'. 
-  # This bypasses the interactive password setting that fails in CI.
-  PRESET_HASH: '$6$g59dEwSjYd2dKj0d$nO3gqVvB0Qf2pBq1hR5N.Oa2b5Gg1s1k.r0Hw6Wp4P.0x/J/i/s/'
 
 jobs:
   build-image:
@@ -26,7 +23,7 @@ jobs:
       - name: 💾 Check out build configurations
         uses: actions/checkout@v4
 
-      # --- Caching Steps for Optimization (Prevents 6hr Timeout) ---
+      # --- Caching Steps for Optimization ---
       - name: 📦 Cache pmbootstrap packages
         uses: actions/cache@v4
         with:
@@ -45,104 +42,85 @@ jobs:
             ${{ runner.os }}-kernel-${{ env.KERNEL_PACKAGE }}-${{ env.KERNEL_BRANCH }}-
       # -------------------------------------------------------------
 
-      - name: Configure git
+      - name: Setup environment and install pmbootstrap
         run: |
+          # Git identity (from build.sh)
           git config --global user.email "example@example.com"
-          git config --global user.name "neonmodder123"
+          git config --global user.name "Nonta72"
 
-      - name: Substitute placeholders in configs
-        run: |
+          # Replace placeholders in .cfg file (from build.sh)
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
 
-      - name: Install pmbootstrap from git
-        run: |
+          # Install pmbootstrap from Git (from build.sh)
           git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
           mkdir -p ~/.local/bin
+          rm -f ~/.local/bin/pmbootstrap
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
           pmbootstrap --version
 
-      - name: Setup pmaports
+      - name: Setup pmaports and Kernel Sources
         run: |
           echo -e '\n\n' | pmbootstrap init || true
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
+          
+          # Kernel branch setup (from build.sh)
           git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
-          git reset --hard sc7280/$DEFAULT_BRANCH          
+          git reset --hard sc7280/$DEFAULT_BRANCH
+          
+          # Clone kernel sources
+          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
 
-      - name: 📁 Copy custom fstab and full Device Package to pmaports
-        id: copy_device_package
+      - name: 📁 Copy Device Package and Configs
         run: |
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
           DEVICE_PATH=device/nothing/Spacewar/
           
+          # Copy Device Package
           mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
           cp -r device/nothing/Spacewar/* $PMAPORTS_DIR/$DEVICE_PATH
           
-          echo "Successfully copied full device package for nothing/Spacewar."
-          
-          if [ ! -f $PMAPORTS_DIR/$DEVICE_PATH/deviceinfo ]; then
-              echo "Error: deviceinfo file still missing after copy. Check your local repository structure."
-              exit 1
-          fi
-
-      - name: Clone kernel sources
-        run: |
-          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
-
-      - name: Prepare Device Configs
-        run: |
-          cp ${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap_v3.cfg
-          cp ${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap.cfg
-          cp ${{ env.KERNEL_CONFIG_FRAGMENT }} linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
+          # Copy config to pmbootstrap
+          cp $PWD/${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap_v3.cfg
+          cp $PWD/${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap.cfg
+          cp $PWD/${{ env.KERNEL_CONFIG_FRAGMENT }} $PWD/linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
 
       - name: 💻 Compile and Package Kernel with envkernel
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
           echo "Kernel cache miss. Compiling kernel..."
-          cd linux
+          cd $PWD/linux
           shopt -s expand_aliases
-          source ../pmbootstrap/helpers/envkernel.sh
+          source $PWD/pmbootstrap/helpers/envkernel.sh
           make defconfig ${{ env.KERNEL_CONFIG_FRAGMENT }}
           make -j$(nproc)
           pmbootstrap build --envkernel ${{ env.KERNEL_PACKAGE }}
         
       - name: Create artifact directory
-        run: |
-          mkdir out
+        run: mkdir out
 
-      ---
-      
-      - name: 🏗️ Build and Export Stowaway Image (With Password Fix)
+      - name: 🏗️ Build and Export Stowaway Image
         run: |
-          # 1. Build initial rootfs (do not use --password here, as it fails)
-          pmbootstrap install
+          # 1. Build initial rootfs, piping the password '1114' twice (for verification)
+          echo -e "1114\n1114" | pmbootstrap install
           
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
           
-          # 2. CRITICAL FIX: Inject the preset encrypted password hash directly into /etc/shadow
-          sudo sed -i "s|^user:[^:]*|user:${{ env.PRESET_HASH }}|" ${ROOTFS_DIR}etc/shadow
-          echo "Injected password hash into /etc/shadow."
-
-          # 3. Modify deviceinfo for stowaway boot to /dev/sda11
+          # 2. CRITICAL: Modify deviceinfo for stowaway boot to /dev/sda11
           echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
           
-          # 4. Disable mounting /boot in fstab (as per stowaway guide)
+          # 3. Disable mounting /boot in fstab (standard stowaway requirement)
           sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
           
-          # --- Verification Step ---
-          echo "--- Verifying modified deviceinfo contents ---"
-          cat ${ROOTFS_DIR}etc/deviceinfo
-          echo "--------------------------------------------"
-          
-          # 5. Re-install/Re-package to apply the changes to the boot image
+          # 4. Re-install/Re-package to apply the changes to the boot image
           pmbootstrap install --split
           
-          # 6. Export the final images
+          # 5. Export the images (which creates the temporary .img files we need)
           pmbootstrap export
           
-          # --- Create pmos.tar Archive ---
+          # --- Create pmos.tar.xz Archive and Custom Files ---
           EXPORT_PATH=~/.local/var/pmbootstrap/cache_export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
@@ -150,23 +128,22 @@ jobs:
           PMOS_ROOT_DIR=/tmp/PMOS_ROOT
           mkdir -p ${PMOS_ROOT_DIR}
           
+          # Mount the rootfs image to access its contents
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
-          sudo mount -o loop $BOOT_IMG_PATH ${PMOS_ROOT_DIR}/boot/
           
+          # Compress the entire root filesystem into a tar.xz with xz -9 -T0
           cd ${PMOS_ROOT_DIR}
-          sudo tar -cf /tmp/pmos.tar *
+          sudo tar -cf $PWD/Spacewar_pmos.tar.xz --use-compress-program='xz -9 -T0' *
           
-          sudo umount ${PMOS_ROOT_DIR}/boot/
           sudo umount ${PMOS_ROOT_DIR}
           
-          cp /tmp/pmos.tar $PWD/out/pmos.tar
-          cp $BOOT_IMG_PATH $PWD/out/boot.img
+          # Move artifacts to the output directory with the user's requested names
+          mv $PWD/Spacewar_pmos.tar.xz $PWD/out/Spacewar_pmos.tar.xz
+          cp $BOOT_IMG_PATH $PWD/out/boot-nothing-spacewar.img
           
-          # Clean up pmbootstrap's state
+          # Clean up pmbootstrap's state (from build.sh)
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
-      ---
-      
       - name: ⬆️ Upload artifacts
         uses: actions/upload-artifact@v4
         with:
