@@ -1,4 +1,4 @@
-name: Build weekly images (plasma-mobile)
+name: Stowaway Test (plasma-mobile)
 on:
   workflow_dispatch:
   schedule:
@@ -9,7 +9,7 @@ env:
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   STOWAWAY_PARTITION: /dev/sda11
-  KERNEL_CONFIG_FRAGMENT: sc7280.config
+  KERNEL_CONFIG_FRAGMENT: sm7325.config
 
 jobs:
   build-image:
