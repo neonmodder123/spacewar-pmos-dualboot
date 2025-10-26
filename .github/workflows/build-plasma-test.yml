@@ -110,28 +110,29 @@ jobs:
 
       - name: Build nothing-spacewar (Configured for Stowaway)
         run: |
-          # 1. Build initial rootfs
+          # 1. Build initial rootfs (FIX: Pipe password)
           cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
           echo -e "9229\n9229" | pmbootstrap install
           
-          # CRITICAL FIX: Shutdown all active chroots/mounts from the initial install
+          # 2. CRITICAL FIX: Shutdown all active chroots/mounts
           pmbootstrap shutdown 
 
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
           
-          # 2. Inject the Stowaway kernel command line argument
+          # 3. Inject the Stowaway kernel command line argument
           echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
           
-          # 3. Disable mounting /boot in fstab
+          # 4. Disable mounting /boot in fstab
           sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
           
-          # 4. Re-install/Re-package (updates the boot.img with new cmdline)
+          # 5. Re-install/Re-package (updates the boot.img with new cmdline)
+          # FIX: Pipe password into the --split command
           echo -e "9229\n9229" | pmbootstrap install --split 
           
-          # 5. Export the images
+          # 6. Export the images
           pmbootstrap export
           
-          # 6. Create final artifacts (Tarball for Stowaway)
+          # 7. Create final artifacts (Tarball for Stowaway)
           EXPORT_PATH=/tmp/postmarketOS-export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
@@ -142,14 +143,16 @@ jobs:
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
           
           cd ${PMOS_ROOT_DIR}
-          sudo tar -cf $PWD/Spacewar_pmos.tar.xz --use-compress-program='xz -9 -T0' *
+          
+          # FIX: Use compression level -6 and save directly to $PWD/out to avoid /tmp space/memory issues
+          sudo tar -cf $PWD/out/Spacewar_pmos.tar.xz --use-compress-program='xz -6 -T0' *
           
           sudo umount ${PMOS_ROOT_DIR}
           
-          mv $PWD/Spacewar_pmos.tar.xz $PWD/out/Spacewar_pmos.tar.xz
+          mv $PWD/out/Spacewar_pmos.tar.xz $PWD/out/Spacewar_pmos.tar.xz # Redundant, but ensures file is in out/
           cp $BOOT_IMG_PATH $PWD/out/boot-nothing-spacewar.img
 
-          # Final cleanup
+          # 8. Final cleanup
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
       - name: Upload artifacts
