@@ -1,8 +1,8 @@
-name: Optimized Stowaway Build (Two-Stage)
+name: Build test (plasma-mobile)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * 5' # Run every Friday at 2:00 AM UTC
+    - cron: '0 2 * * 5'
 
 env:
   # Configuration variables
@@ -10,8 +10,8 @@ env:
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   STOWAWAY_PARTITION: /dev/sda11
-  KERNEL_CONFIG_FRAGMENT: sc7280.config
-  PMOS_PASSWORD: 9229 # Static password for non-interactive install
+  KERNEL_CONFIG_FRAGMENT: sm7325.config
+  PMOS_PASSWORD: 9229
 
 # =========================================================
 # JOB 1: KERNEL COMPILATION (SLOW, CACHE-DRIVEN)
@@ -137,11 +137,11 @@ jobs:
           # 1. Create artifact directory
           mkdir out
           
-          # 2. Build initial rootfs (FIX: Pipe password twice)
+          # 2. Build initial rootfs (Pipe password)
           cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
           echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install
           
-          # 3. CRITICAL FIX: Shutdown all active chroots/mounts (Prevents mkfs errors)
+          # 3. CRITICAL FIX: Shutdown all active chroots/mounts
           pmbootstrap shutdown 
 
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
@@ -174,7 +174,7 @@ jobs:
           # Copy the boot image to the correct artifact directory
           cp $BOOT_IMG_PATH $GITHUB_WORKSPACE/out/boot-nothing-spacewar.img
 
-          # 8. Final cleanup (FIX: Robust shutdown and zap)
+          # 8. Final cleanup (Robust shutdown and zap)
           echo "y" | pmbootstrap shutdown
           echo "y" | pmbootstrap zap -hc
           echo "--- Stowaway Image Build Complete ---"
