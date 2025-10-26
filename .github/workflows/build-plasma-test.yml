@@ -6,12 +6,10 @@ on:
 
 env:
   KERNEL_BRANCH: danila/spacewar-testing
-  # Define variables for consistency and maintainability
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   PMBOOTSTRAP_CONFIG: nothing-spacewar-plasma.cfg
   KERNEL_CONFIG_FRAGMENT: sm7325.config
-  # CRITICAL: Define the target partition for the stowaway method
   STOWAWAY_PARTITION: /dev/sda11
 
 jobs:
@@ -36,11 +34,9 @@ jobs:
 
       - name: 💾 Cache Built Kernel
         uses: actions/cache@v4
-        id: cache-kernel
+        id: cache-kernel # <--- Line before the potential error zone
         with:
-          # Cache built .apk files in the packages directory
           path: ~/.local/var/pmbootstrap/packages/main/${{ env.KERNEL_PACKAGE }}*/*.apk
-          # Key incorporates kernel name, branch, and config fragment hash
           key: ${{ runner.os }}-kernel-${{ env.KERNEL_PACKAGE }}-${{ env.KERNEL_BRANCH }}-${{ hashFiles(env.KERNEL_CONFIG_FRAGMENT) }}
           restore-keys: |
             ${{ runner.os }}-kernel-${{ env.KERNEL_PACKAGE }}-${{ env.KERNEL_BRANCH }}-
@@ -72,30 +68,22 @@ jobs:
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH          
 
-      ---
-
       - name: 📁 Copy custom fstab and full Device Package to pmaports (Fix for deviceinfo error)
         id: copy_device_package
         run: |
           PMAPORTS_DIR=~/.local/var/pmbootstrap/cache_git/pmaports
           DEVICE_PATH=device/nothing/Spacewar/
           
-          # 1. Ensure the target directory exists inside the pmaports clone
           mkdir -p $PMAPORTS_DIR/$DEVICE_PATH
           
-          # 2. Copy the entire local device package contents (including deviceinfo and fstab)
-          # This resolves the "deviceinfo file not found" error.
           cp -r device/nothing/Spacewar/* $PMAPORTS_DIR/$DEVICE_PATH
           
           echo "Successfully copied full device package for nothing/Spacewar."
           
-          # 3. Verification step for deviceinfo
           if [ ! -f $PMAPORTS_DIR/$DEVICE_PATH/deviceinfo ]; then
               echo "Error: deviceinfo file still missing after copy. Check your local repository structure."
               exit 1
           fi
-
-      ---
 
       - name: Clone kernel sources
         run: |
@@ -107,8 +95,8 @@ jobs:
           cp ${{ env.PMBOOTSTRAP_CONFIG }} ~/.config/pmbootstrap.cfg
           cp ${{ env.KERNEL_CONFIG_FRAGMENT }} linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
 
+      # L75/L76 Area: Ensure 'if:' is correctly indented under the '- name:' step
       - name: 💻 Compile and Package Kernel with envkernel
-        # Only run if the cache missed (cache-hit != 'true')
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
           echo "Kernel cache miss. Compiling kernel..."
@@ -123,14 +111,11 @@ jobs:
         run: |
           mkdir out
 
-      ---
-      
       - name: 🏗️ Build and Export Stowaway Image
         run: |
           # 1. Build initial rootfs (Uses cached packages if available)
           pmbootstrap install --password 1114
           
-          # Define paths (Chroot rootfs directory)
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
           
           # 2. CRITICAL: Modify deviceinfo for stowaway boot to /dev/sda11
@@ -150,7 +135,6 @@ jobs:
           # 5. Export the final images
           pmbootstrap export
           
-          # Define paths for exported images
           EXPORT_PATH=~/.local/var/pmbootstrap/cache_export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
@@ -159,27 +143,20 @@ jobs:
           PMOS_ROOT_DIR=/tmp/PMOS_ROOT
           mkdir -p ${PMOS_ROOT_DIR}
           
-          # Mount the images
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
           sudo mount -o loop $BOOT_IMG_PATH ${PMOS_ROOT_DIR}/boot/
           
-          # Create the pmos.tar archive (containing all rootfs and boot files)
           cd ${PMOS_ROOT_DIR}
           sudo tar -cf /tmp/pmos.tar *
           
-          # Clean up mounts
           sudo umount ${PMOS_ROOT_DIR}/boot/
           sudo umount ${PMOS_ROOT_DIR}
           
-          # Copy final artifacts to output directory
           cp /tmp/pmos.tar $PWD/out/pmos.tar
           cp $BOOT_IMG_PATH $PWD/out/boot.img
           
-          # Clean up pmbootstrap's state
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
-      ---
-      
       - name: ⬆️ Upload artifacts
         uses: actions/upload-artifact@v4
         with:
