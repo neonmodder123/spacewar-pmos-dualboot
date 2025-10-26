@@ -1,4 +1,4 @@
-name: Build nightly images (plasma-mobile)
+name: Build test (plasma-mobile)
 on:
   workflow_dispatch:
   schedule:
