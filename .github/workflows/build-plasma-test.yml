@@ -1,4 +1,4 @@
-name: Build weekly images (plasma-mobile)
+name: Stowaway Test plasma-mobile
 on:
   workflow_dispatch:
   schedule:
