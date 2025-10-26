@@ -23,35 +23,30 @@ jobs:
       - name: 💾 Checkout Code
         uses: actions/checkout@v4
       
-      - name: Install pmbootstrap and Configure Git
+      - name: Substitute placeholders in configs
         run: |
-          # 1. Configure Git and PMOS environment
-          git config --global user.email "veythrix@gmail.com"
-          git config --global user.name "Veythrix"
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
-          
-          # 2. Install pmbootstrap
+
+      - name: Install pmbootstrap from git
+        run: |
           git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
+          pmbootstrap --version
 
       - name: Set up pmaports and Copy Device Package
         run: |
           echo -e '\n\n' | pmbootstrap init || true
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          
-          # 1. Fetch pmaports branch
           git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
           
-          # 2. Define source directory in the main workspace and target directory in pmaports
-          DEVICE_SOURCE_DIR="$GITHUB_WORKSPACE/device/nothing/Spacewar"
+          DEVICE_SOURCE_DIR="$PWD/device/nothing/Spacewar"
           PMAPORTS_DEVICE_DIR="$PWD/device/nothing/Spacewar"
           
-          # 3. Copy files from original repo directory (outside of current $PWD)
           mkdir -p $PMAPORTS_DEVICE_DIR
           find $DEVICE_SOURCE_DIR -maxdepth 1 -type f -exec cp -t $PMAPORTS_DEVICE_DIR {} +
           if [ -d "$DEVICE_SOURCE_DIR/etc" ]; then
@@ -59,12 +54,8 @@ jobs:
               cp -r $DEVICE_SOURCE_DIR/etc/. $PMAPORTS_DEVICE_DIR/etc/
           fi
           echo "Successfully copied device package files."
-          
-          # 4. Copy config fragments
-          cp $GITHUB_WORKSPACE/${{ env.KERNEL_CONFIG_FRAGMENT }} $PWD/linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}
-          cp $GITHUB_WORKSPACE/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap_v3.cfg
-          
-          cd $GITHUB_WORKSPACE # Return to repo root
+
+          cd -
 
       - name: 📦 Restore ccache and packages
         uses: actions/cache@v4
