@@ -1,4 +1,4 @@
-name: Build test (plasma-mobile)
+name: Optimized Stowaway Build (Two-Stage)
 on:
   workflow_dispatch:
   schedule:
@@ -10,7 +10,7 @@ env:
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   STOWAWAY_PARTITION: /dev/sda11
-  KERNEL_CONFIG_FRAGMENT: sm7325.config
+  KERNEL_CONFIG_FRAGMENT: sc7280.config
   PMOS_PASSWORD: 9229 # Static password for non-interactive install
 
 # =========================================================
@@ -26,8 +26,8 @@ jobs:
       - name: Install pmbootstrap and Setup pmaports
         run: |
           # 1. Configure Git and Path
-          git config --global user.email "example@example.com"
-          git config --global user.name "neonmodder123"
+          git config --global user.email "veythrix@gmail.com"
+          git config --global user.name "Veythrix"
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
           
           # 2. Install pmbootstrap
@@ -155,7 +155,7 @@ jobs:
           # 6. Re-install/Re-package (updates the boot.img with new cmdline)
           echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install --split 
           
-          # 7. Export and Create Artifacts (with file path fix)
+          # 7. Export and Create Artifacts
           EXPORT_PATH=/tmp/postmarketOS-export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
@@ -167,16 +167,16 @@ jobs:
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
           cd ${PMOS_ROOT_DIR}
           
-          # FIX APPLIED HERE: Use $GITHUB_WORKSPACE/out for the output file
-          # This writes the tarball to the repository's artifact directory, not inside the mounted image.
+          # FIX: Write the tarball to the repository's artifact directory ($GITHUB_WORKSPACE/out)
           sudo tar -cf $GITHUB_WORKSPACE/out/Spacewar_pmos.tar.xz --use-compress-program='xz -6 -T0' *
           
           sudo umount ${PMOS_ROOT_DIR}
           # Copy the boot image to the correct artifact directory
           cp $BOOT_IMG_PATH $GITHUB_WORKSPACE/out/boot-nothing-spacewar.img
 
-          # 8. Final cleanup
-          echo "n" | pmbootstrap zap -hc
+          # 8. Final cleanup (FIX: Robust shutdown and zap)
+          echo "y" | pmbootstrap shutdown
+          echo "y" | pmbootstrap zap -hc
           echo "--- Stowaway Image Build Complete ---"
 
       - name: Upload artifacts
