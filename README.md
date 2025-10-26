@@ -1,1 +1,1 @@
-STATUS: postmarketOS boots, just need to fix the postmarketOS debug shell error
+STATUS: postmarketOS boots, just need to reconfigure pmOS to boot to /dev/sda11
