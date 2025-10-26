@@ -55,8 +55,6 @@ jobs:
           fi
           echo "Successfully copied device package files."
 
-          cd -
-
       - name: 📦 Restore ccache and packages
         uses: actions/cache@v4
         with:
