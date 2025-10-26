@@ -115,7 +115,7 @@ jobs:
         run: |
           # 1. Build initial rootfs (FIXED: Pipe password twice for non-interactive success)
           cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
-          echo -e "9229\n9229" | pmbootstrap install
+          echo -e "9229\n9229" | pmbootstrap install  # <- Initial install is successful
           
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
           
@@ -126,12 +126,14 @@ jobs:
           sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
           
           # 4. Re-install/Re-package to apply the changes to the boot image
-          pmbootstrap install --split
+          # FIX: Apply pipe to --split to prevent repeated password failures
+          echo -e "9229\n9229" | pmbootstrap install --split 
           
           # 5. Export the images
           pmbootstrap export
           
-          # 6. Create final artifacts (Tarball for Stowaway)
+          # ... (rest of the file copying and cleanup logic) ...
+          
           EXPORT_PATH=/tmp/postmarketOS-export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
@@ -139,7 +141,6 @@ jobs:
           PMOS_ROOT_DIR=/tmp/PMOS_ROOT
           mkdir -p ${PMOS_ROOT_DIR}
 
-          # Mount rootfs and create the final compressed archive (tar.xz)
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
           
           cd ${PMOS_ROOT_DIR}
@@ -147,11 +148,9 @@ jobs:
           
           sudo umount ${PMOS_ROOT_DIR}
           
-          # Move artifacts to the output directory
           mv $PWD/Spacewar_pmos.tar.xz $PWD/out/Spacewar_pmos.tar.xz
           cp $BOOT_IMG_PATH $PWD/out/boot-nothing-spacewar.img
 
-          # Cleanup
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
       - name: Upload artifacts
