@@ -55,24 +55,14 @@ jobs:
           
           cd $GITHUB_WORKSPACE # Return to repo root
 
-      - name: 📦 Restore ccache and packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.local/var/pmbootstrap/cache
-            ~/.local/var/pmbootstrap/cache_ccache_*
-          key: ${{ runner.os }}-pmbootstrap-v1-${{ hashFiles('**/APKBUILD') }}
-          restore-keys: |
-            ${{ runner.os }}-pmbootstrap-v1-
-
-      - name: 💾 Cache Built Kernel APK
+      - name: 📦 Restore/Cache ALL pmbootstrap Data
         uses: actions/cache@v4
         id: cache-kernel
         with:
-          path: ~/.local/var/pmbootstrap/packages/main/${{ env.KERNEL_PACKAGE }}*/*.apk
-          key: ${{ runner.os }}-kernel-stable-v1-${{ env.KERNEL_BRANCH }}-${{ hashFiles(env.KERNEL_CONFIG_FRAGMENT) }}
+          path: ~/.local/var/pmbootstrap/
+          key: pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-${{ hashFiles('**/APKBUILD', env.KERNEL_CONFIG_FRAGMENT) }}
           restore-keys: |
-            ${{ runner.os }}-kernel-stable-v1-${{ env.KERNEL_BRANCH }}-
+            pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-
 
       - name: Clone kernel sources
         run: |
@@ -121,13 +111,14 @@ jobs:
           path: ~/.local/var/pmbootstrap/packages/main/${{ env.KERNEL_PACKAGE }}*/*.apk
           key: ${{ runner.os }}-kernel-stable-v1-${{ env.KERNEL_BRANCH }}-${{ hashFiles(env.KERNEL_CONFIG_FRAGMENT) }}
 
-      - name: Restore pmbootstrap cache (for rootfs packages)
+      - name: 📦 Restore/Cache ALL pmbootstrap Data
         uses: actions/cache@v4
+        id: cache-kernel
         with:
-          path: ~/.local/var/pmbootstrap/cache
-          key: ${{ runner.os }}-pmbootstrap-v1-${{ hashFiles('**/APKBUILD') }}
+          path: ~/.local/var/pmbootstrap/
+          key: pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-${{ hashFiles('**/APKBUILD', env.KERNEL_CONFIG_FRAGMENT) }}
           restore-keys: |
-            ${{ runner.os }}-pmbootstrap-v1-
+            pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-
             
       - name: 🚀 Build and Configure Stowaway Image
         run: |
