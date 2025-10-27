@@ -5,17 +5,13 @@ on:
     - cron: '0 2 * * 5'
 
 env:
-  # Configuration variables
   KERNEL_BRANCH: danila/spacewar-testing
   KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
   DEVICE_NAME: nothing-spacewar
   STOWAWAY_PARTITION: /dev/sda11
-  KERNEL_CONFIG_FRAGMENT: sm7325.config  # CORRECT: Using sm7325.config
+  KERNEL_CONFIG_FRAGMENT: sm7325.config 
   PMOS_PASSWORD: 9229
 
-# =========================================================
-# JOB 1: KERNEL COMPILATION (SLOW, CACHE-DRIVEN)
-# =========================================================
 jobs:
   build-kernel:
     runs-on: ubuntu-latest
@@ -61,8 +57,6 @@ jobs:
           fi
           echo "Successfully copied device package files."
           
-          # 4. Copy config fragments (Source path confirmed to be $GITHUB_WORKSPACE)
-          cp "$GITHUB_WORKSPACE/${{ env.KERNEL_CONFIG_FRAGMENT }}" "$PWD/linux/arch/arm64/configs/${{ env.KERNEL_CONFIG_FRAGMENT }}"
           cp "$GITHUB_WORKSPACE/nothing-spacewar-plasma.cfg" ~/.config/pmbootstrap_v3.cfg
           
           cd $GITHUB_WORKSPACE # Return to repo root
@@ -97,23 +91,19 @@ jobs:
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
-          
-          # CRITICAL FIX: Explicitly set architecture and cross-compiler for ARM64 target
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-alpine-linux-musl-
-          
-          # This command now correctly uses the sm7325.config fragment
           make defconfig ${{ env.KERNEL_CONFIG_FRAGMENT }}
           
           make -j$(nproc)
           
           pmbootstrap build --envkernel ${{ env.KERNEL_PACKAGE }}
-          echo "--- KERNEL COMPILATION COMPLETE ---"
+          echo "Kernel Build Complete!"
         
       - name: Skip kernel compilation (Cache Hit)
         if: steps.cache-kernel.outputs.cache-hit == 'true'
         run: |
-          echo "--- KERNEL CACHE HIT: Skipping compilation step! (Instant) ---"
+          echo "Found Cached Kernel!"
 
 # =========================================================
 # JOB 2: IMAGE BUILD (FAST, USES PRE-BUILT KERNEL)
@@ -149,28 +139,21 @@ jobs:
             
       - name: 🚀 Build and Configure Stowaway Image
         run: |
-          # 1. Create artifact directory
           mkdir out
           
-          # 2. Build initial rootfs (Pipe password)
           cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
           echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install
           
-          # 3. CRITICAL FIX: Shutdown all active chroots/mounts
           pmbootstrap shutdown 
 
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
           
-          # 4. Inject Stowaway kernel cmdline
           echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
           
-          # 5. Disable mounting /boot in fstab
           sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
-          
-          # 6. Re-install/Re-package (updates the boot.img with new cmdline)
+
           echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install --split 
           
-          # 7. Export and Create Artifacts
           EXPORT_PATH=/tmp/postmarketOS-export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
@@ -178,21 +161,17 @@ jobs:
           PMOS_ROOT_DIR=/tmp/PMOS_ROOT
           mkdir -p ${PMOS_ROOT_DIR}
           
-          # Mount rootfs and compress contents
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
           cd ${PMOS_ROOT_DIR}
           
-          # FIX: Write the tarball to the repository's artifact directory ($GITHUB_WORKSPACE/out)
           sudo tar -cf $GITHUB_WORKSPACE/out/Spacewar_pmos.tar.xz --use-compress-program='xz -6 -T0' *
           
           sudo umount ${PMOS_ROOT_DIR}
-          # Copy the boot image to the correct artifact directory
           cp $BOOT_IMG_PATH $GITHUB_WORKSPACE/out/boot-nothing-spacewar.img
 
-          # 8. Final cleanup (Robust shutdown and zap)
           echo "y" | pmbootstrap shutdown
           echo "y" | pmbootstrap zap -hc
-          echo "--- Stowaway Image Build Complete ---"
+          echo "Stowaway Build Complete!"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
