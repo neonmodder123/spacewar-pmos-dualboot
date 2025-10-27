@@ -21,12 +21,10 @@ jobs:
       
       - name: Install pmbootstrap and Configure Git
         run: |
-          # 1. Configure Git and PMOS environment
-          git config --global user.email "veythrix@gmail.com"
-          git config --global user.name "Veythrix"
+          git config --global user.email "example@example.com"
+          git config --global user.name "neonmodder123"
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
-          
-          # 2. Install pmbootstrap
+
           git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
@@ -35,20 +33,16 @@ jobs:
       - name: Set up pmaports and Copy Device Package
         run: |
           echo -e '\n\n' | pmbootstrap init || true
-          # Change to the pmaports directory
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          
-          # 1. Fetch pmaports branch
+
           git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
-          
-          # 2. Define source directory in the main workspace and target directory in pmaports
+
           DEVICE_SOURCE_DIR="$GITHUB_WORKSPACE/device/nothing/Spacewar"
           PMAPORTS_DEVICE_DIR="$PWD/device/nothing/Spacewar"
-          
-          # 3. Copy files from original repo directory (using $GITHUB_WORKSPACE)
+
           mkdir -p $PMAPORTS_DEVICE_DIR
           find $DEVICE_SOURCE_DIR -maxdepth 1 -type f -exec cp -t $PMAPORTS_DEVICE_DIR {} +
           if [ -d "$DEVICE_SOURCE_DIR/etc" ]; then
@@ -138,37 +132,39 @@ jobs:
       - name: 🚀 Build and Configure Stowaway Image
         run: |
           mkdir out
-
+          
           cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
           echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install
-
+          
           pmbootstrap shutdown 
 
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
-
+          
           echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
-
+          
           sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
-
+          
           echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install --split 
-
+          
           pmbootstrap export 
-
+          
           EXPORT_PATH=/tmp/postmarketOS-export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
           
           PMOS_ROOT_DIR=/tmp/PMOS_ROOT
           mkdir -p ${PMOS_ROOT_DIR}
-
+          
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
           cd ${PMOS_ROOT_DIR}
-
+          
           sudo tar -cf $GITHUB_WORKSPACE/out/Spacewar_pmos.tar.xz --use-compress-program='xz -6 -T0' *
+          
+          cd $GITHUB_WORKSPACE 
           
           sudo umount ${PMOS_ROOT_DIR}
           cp $BOOT_IMG_PATH $GITHUB_WORKSPACE/out/boot-nothing-spacewar.img
-          
+
           echo "y" | pmbootstrap shutdown
           echo "y" | pmbootstrap zap -hc
           echo "Stowaway Image Build Complete!"
