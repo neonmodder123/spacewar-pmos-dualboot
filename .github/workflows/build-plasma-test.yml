@@ -87,7 +87,7 @@ jobs:
       - name: Compile kernel with envkernel
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
-          echo "--- KERNEL CACHE MISSED: COMPILING KERNEL (~45 mins) ---"
+          echo "Found no cached kernel.."
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
@@ -103,11 +103,9 @@ jobs:
       - name: Skip kernel compilation (Cache Hit)
         if: steps.cache-kernel.outputs.cache-hit == 'true'
         run: |
-          echo "Found Cached Kernel!"
+          echo "Found Cached Kernel! Skipping to build image.."
 
-# =========================================================
-# JOB 2: IMAGE BUILD (FAST, USES PRE-BUILT KERNEL)
-# =========================================================
+
   build-image:
     needs: build-kernel
     runs-on: ubuntu-latest
