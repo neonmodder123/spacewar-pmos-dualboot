@@ -138,38 +138,40 @@ jobs:
       - name: 🚀 Build and Configure Stowaway Image
         run: |
           mkdir out
-          
+
           cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
           echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install
-          
+
           pmbootstrap shutdown 
 
           ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
-          
+
           echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
-          
+
           sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
 
           echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install --split 
-          
+
+          pmbootstrap export 
+
           EXPORT_PATH=/tmp/postmarketOS-export
           ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
           BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
           
           PMOS_ROOT_DIR=/tmp/PMOS_ROOT
           mkdir -p ${PMOS_ROOT_DIR}
-          
+
           sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
           cd ${PMOS_ROOT_DIR}
-          
+
           sudo tar -cf $GITHUB_WORKSPACE/out/Spacewar_pmos.tar.xz --use-compress-program='xz -6 -T0' *
           
           sudo umount ${PMOS_ROOT_DIR}
           cp $BOOT_IMG_PATH $GITHUB_WORKSPACE/out/boot-nothing-spacewar.img
-
+          
           echo "y" | pmbootstrap shutdown
           echo "y" | pmbootstrap zap -hc
-          echo "Stowaway Build Complete!"
+          echo "Stowaway Image Build Complete!"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
