@@ -93,7 +93,7 @@ jobs:
           source ../pmbootstrap/helpers/envkernel.sh
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-alpine-linux-musl-
-          make defconfig ${{ env.KERNEL_CONFIG_FRAGMENT }}
+          make defconfig sc7280.config
           
           make -j$(nproc)
           
