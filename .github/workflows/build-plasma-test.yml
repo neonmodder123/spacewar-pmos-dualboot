@@ -1,4 +1,4 @@
-name: Optimized Stowaway Build (Two-Stage)
+name: Build Test (plasma-mobile)
 on:
   workflow_dispatch:
   schedule:
@@ -87,7 +87,8 @@ jobs:
             ${{ runner.os }}-kernel-stable-v1-${{ env.KERNEL_BRANCH }}-
 
       - name: Clone kernel sources
-        run: git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
+        run: |
+          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
 
       - name: Compile kernel with envkernel
         if: steps.cache-kernel.outputs.cache-hit != 'true'
@@ -111,7 +112,8 @@ jobs:
         
       - name: Skip kernel compilation (Cache Hit)
         if: steps.cache-kernel.outputs.cache-hit == 'true'
-        run: echo "--- KERNEL CACHE HIT: Skipping compilation step! (Instant) ---"
+        run: |
+          echo "--- KERNEL CACHE HIT: Skipping compilation step! (Instant) ---"
 
 # =========================================================
 # JOB 2: IMAGE BUILD (FAST, USES PRE-BUILT KERNEL)
