@@ -157,8 +157,8 @@ jobs:
           cp $BOOT_IMG_PATH $GITHUB_WORKSPACE/out/boot-nothing-spacewar.img
 
           echo "y" | pmbootstrap shutdown
-          echo "y" | pmbootstrap zap -hc
-          echo "Stowaway Image Build Complete!"
+          yes | pmbootstrap zap -hc
+          echo "Stowaway Build Complete!"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
