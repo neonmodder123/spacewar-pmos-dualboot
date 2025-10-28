@@ -35,13 +35,14 @@ jobs:
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
 
-      - name: ⚙️ Build Target Kernel Package
-        run: |
-          export PATH="$PATH:~/.local/bin"
-          echo "Starting kernel build for ${{ env.DEVICE_NAME }}..."
-          
-          # Force the device codename and build the specific kernel package
-          pmbootstrap build --device ${{ env.DEVICE_NAME }} ${{ env.KERNEL_PACKAGE }}
+      - name: 📦 Restore/Cache ALL pmbootstrap Data
+        uses: actions/cache@v4
+        id: cache-kernel
+        with:
+          path: ~/.local/var/pmbootstrap/
+          key: pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-${{ hashFiles('**/APKBUILD', env.KERNEL_CONFIG_FRAGMENT) }}
+          restore-keys: |
+            pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-
 
       - name: 🎁 Package pmbootstrap Data into Tar Archive
         run: |
