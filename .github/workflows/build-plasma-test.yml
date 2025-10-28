@@ -25,7 +25,7 @@ jobs:
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
-          echo -e "edge\nnothing\nspacewar\nstable\n\n" | pmbootstrap init
+          echo -e "\nnothing\nspacewar\n\n\n" | pmbootstrap init
 
       - name: Set up pmaports and Copy Device Package
         run: |
