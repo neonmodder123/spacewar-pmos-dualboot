@@ -1,4 +1,4 @@
-name: 1. Build and Package Kernel Cache Artifact
+name: Get Cached Kernel
 
 on:
   workflow_dispatch:
