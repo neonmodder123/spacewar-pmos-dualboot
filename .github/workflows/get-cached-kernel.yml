@@ -5,7 +5,7 @@ on:
   push:
     paths:
       - 'aports/device/nothing/spacewar/linux-nothing-spacewar/**'
-      - '.github/workflows/cache_to_artifact.yml'
+      - '.github/workflows/get-cached-kernel.yml'
 
 env:
   DEVICE_NAME: nothing-spacewar
@@ -34,11 +34,6 @@ jobs:
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
-
-          # 2. Initialize pmbootstrap non-interactively
-          # Sequence: [edge]\n, nothing\n, spacewar\n, [stable]\n, handset\n, [none]\n, [work path]\n, [pmaports path]\n
-          echo "Running pmbootstrap init non-interactively..."
-          echo -e "\nnothing\nspacewar\n\nhandset\n\n\n\n" | pmbootstrap init
 
       - name: ⚙️ Build Target Kernel Package
         run: |
