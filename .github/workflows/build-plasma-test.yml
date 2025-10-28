@@ -19,19 +19,20 @@ jobs:
       - name: 💾 Checkout Code
         uses: actions/checkout@v4
       
-      - name: Install pmbootstrap and Init
+      - name: Install pmbootstrap (Setup Only)
         run: |
           git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
-          echo -e "\nnothing\nspacewar\n\n\n" | pmbootstrap init
+
+      - name: Setup SSH Session for pmbootstrap init
+        uses: mxschmitt/action-tmate@v3
+        if: github.event_name == 'workflow_dispatch'
 
       - name: Set up pmaports and Copy Device Package
         run: |
-          echo -e '\n\n' | pmbootstrap init || true
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-
           git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
