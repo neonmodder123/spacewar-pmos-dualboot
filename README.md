@@ -1,1 +1,1 @@
-STATUS: postmarketOS boots, just need to reconfigure pmOS to boot to /dev/sda11
+STATUS: The postmarketOS image got built, just need to flash and test!
