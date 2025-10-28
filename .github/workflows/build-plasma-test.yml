@@ -19,16 +19,14 @@ jobs:
       - name: 💾 Checkout Code
         uses: actions/checkout@v4
       
-      - name: Install pmbootstrap and Configure Git
+      - name: Install pmbootstrap and Init
         run: |
-          git config --global user.email "example@example.com"
-          git config --global user.name "neonmodder123"
-          find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
-
           git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
+          # *** FIX: Specify the target device here ***
+          echo -e '\n\n' | pmbootstrap init --device ${{ env.DEVICE_NAME }} || true
 
       - name: Set up pmaports and Copy Device Package
         run: |
@@ -104,12 +102,6 @@ jobs:
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           export PATH="$PATH:~/.local/bin"
           echo -e '\n\n' | pmbootstrap init || true
-
-      - name: 📦 Restore Kernel APK (Instant Load)
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/var/pmbootstrap/packages/main/${{ env.KERNEL_PACKAGE }}*/*.apk
-          key: ${{ runner.os }}-kernel-stable-v1-${{ env.KERNEL_BRANCH }}-${{ hashFiles(env.KERNEL_CONFIG_FRAGMENT) }}
 
       - name: 📦 Restore/Cache ALL pmbootstrap Data
         uses: actions/cache@v4
