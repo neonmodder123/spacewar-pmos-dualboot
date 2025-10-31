@@ -63,7 +63,7 @@ jobs:
         run: |
           cd linux
           shopt -s expand_aliases
-          source /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualbootj/pmbootstrap/helpers/envkernel.sh
+          source /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualboot/pmbootstrap/helpers/envkernel.sh
           make defconfig sc7280.config
           make -j$(nproc)
           pmbootstrap build --envkernel linux-postmarketos-qcom-sc7280
@@ -88,3 +88,4 @@ jobs:
           name: nothing-spacewar-plasma.zip
           path: out/*-spacewar.img*
           retention-days: 7
+
