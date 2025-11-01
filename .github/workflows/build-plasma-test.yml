@@ -1,160 +1,102 @@
-name: Build Test (plasma-mobile)
+name: Build test images (plasma-mobile)
 on:
+  #push: Disable build on push for now
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * 5'
+    - cron: '0 2 * * 5' # Run every friday at midnight
 
 env:
   KERNEL_BRANCH: danila/spacewar-testing
-  KERNEL_PACKAGE: linux-postmarketos-qcom-sc7280
-  DEVICE_NAME: nothing-spacewar
-  STOWAWAY_PARTITION: /dev/sda11
-  KERNEL_CONFIG_FRAGMENT: sm7325.config 
-  PMOS_PASSWORD: 9229
 
 jobs:
-  build-kernel:
+  build-image:
+    strategy:
+      matrix:
+        version: ["default"]
+
     runs-on: ubuntu-latest
     steps:
-      - name: 💾 Checkout Code
+      - name: Check out build configurations
         uses: actions/checkout@v4
-      
-      - name: Install pmbootstrap (Setup Only)
+
+      - name: Configure git
+        run: |
+          git config --global user.email "veythrix@gmail.com"
+          git config --global user.name "Veythrix"
+
+      - name: Substitute placeholders in configs
+        run: |
+          find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
+
+      - name: Install pmbootstrap from git
         run: |
           git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
-          export PATH="$PATH:~/.local/bin"
+          pmbootstrap --version
 
-      - name: Setup SSH Session for pmbootstrap init
-        uses: mxschmitt/action-tmate@v3
-        if: github.event_name == 'workflow_dispatch'
-
-      - name: Set up pmaports and Copy Device Package
+      - name: Set up pmaports
         run: |
+          echo -e '\n\n' | pmbootstrap init || true
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
           git remote add sc7280 https://github.com/mainlining/pmaports.git
           DEFAULT_BRANCH=danila/spacewar-mr
           git fetch sc7280 $DEFAULT_BRANCH
           git reset --hard sc7280/$DEFAULT_BRANCH
 
-          DEVICE_SOURCE_DIR="$GITHUB_WORKSPACE/device/nothing/Spacewar"
-          PMAPORTS_DEVICE_DIR="$PWD/device/nothing/Spacewar"
-
-          mkdir -p $PMAPORTS_DEVICE_DIR
-          find $DEVICE_SOURCE_DIR -maxdepth 1 -type f -exec cp -t $PMAPORTS_DEVICE_DIR {} +
-          if [ -d "$DEVICE_SOURCE_DIR/etc" ]; then
-              mkdir -p $PMAPORTS_DEVICE_DIR/etc
-              cp -r $DEVICE_SOURCE_DIR/etc/. $PMAPORTS_DEVICE_DIR/etc/
-          fi
-          echo "Successfully copied device package files."
-          
-          cp "$GITHUB_WORKSPACE/nothing-spacewar-plasma.cfg" ~/.config/pmbootstrap_v3.cfg
-          
-          cd $GITHUB_WORKSPACE # Return to repo root
-
-      - name: 📦 Restore/Cache ALL pmbootstrap Data
-        uses: actions/cache@v4
-        id: cache-kernel
-        with:
-          path: ~/.local/var/pmbootstrap/
-          key: pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-${{ hashFiles('**/APKBUILD', env.KERNEL_CONFIG_FRAGMENT) }}
-          restore-keys: |
-            pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-
+      - name: Check kernel branch
+        if: matrix.version == 'default'
+        run: |
+          DEFAULT_BRANCH=danila/spacewar-testing
+          echo "Default branch is $DEFAULT_BRANCH"
+          echo "KERNEL_BRANCH=$DEFAULT_BRANCH" >> $GITHUB_ENV
 
       - name: Clone kernel sources
         run: |
           git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
 
-      - name: Compile kernel with envkernel
-        if: steps.cache-kernel.outputs.cache-hit != 'true'
+      - name: Choose nothing-spacewar device in pmbootstrap to build kernel
         run: |
-          echo "Found no cached kernel.."
+          cp /home/runner/spacewar-pmos-dualboot/spacewar-pmos-dualboot/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap_v3.cfg
+
+      - name: Compile kernel with envkernel
+        run: |
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
-          export ARCH=arm64
-          export CROSS_COMPILE=aarch64-alpine-linux-musl-
           make defconfig sc7280.config
-          
           make -j$(nproc)
-          
-          pmbootstrap build --envkernel ${{ env.KERNEL_PACKAGE }}
-          echo "Kernel Build Complete!"
-        
-      - name: Skip kernel compilation (Cache Hit)
-        if: steps.cache-kernel.outputs.cache-hit == 'true'
+          pmbootstrap build --envkernel linux-postmarketos-qcom-sc7280
+
+
+      - name: Create artifact directory
         run: |
-          echo "Found Cached Kernel! Skipping to build image.."
+          mkdir /tmp/out
 
-
-  build-image:
-    needs: build-kernel
-    runs-on: ubuntu-latest
-    steps:
-      - name: 💾 Checkout Code
-        uses: actions/checkout@v4
-        
-      - name: Install pmbootstrap and Init
+      - name: Build nothing-spacewar
         run: |
-          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
-          mkdir -p ~/.local/bin
-          ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
-          export PATH="$PATH:~/.local/bin"
-          echo -e '\n\n' | pmbootstrap init || true
-
-      - name: 📦 Restore/Cache ALL pmbootstrap Data
-        uses: actions/cache@v4
-        id: cache-kernel
-        with:
-          path: ~/.local/var/pmbootstrap/
-          key: pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-${{ hashFiles('**/APKBUILD', env.KERNEL_CONFIG_FRAGMENT) }}
-          restore-keys: |
-            pmos_spacewar_FULL_V1-${{ runner.os }}-${{ env.KERNEL_BRANCH }}-
-            
-      - name: 🚀 Build and Configure Stowaway Image
-        run: |
-          mkdir out
-          
-          cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
-          echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install
-          
-          pmbootstrap shutdown 
-
-          ROOTFS_DIR=$(echo ~/.local/var/pmbootstrap/chroot_rootfs_*/)
-          
-          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=${{ env.STOWAWAY_PARTITION }}\"" | sudo tee -a ${ROOTFS_DIR}etc/deviceinfo
-          
-          sudo sed -i '3,0s/^/#/' ${ROOTFS_DIR}etc/fstab
-          
-          echo -e "${{ env.PMOS_PASSWORD }}\n${{ env.PMOS_PASSWORD }}" | pmbootstrap install --split 
-          
-          pmbootstrap export 
-          
-          EXPORT_PATH=/tmp/postmarketOS-export
-          ROOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-root.img" -print -quit)
-          BOOT_IMG_PATH=$(find ${EXPORT_PATH} -name "*-boot.img" -print -quit)
-          
-          PMOS_ROOT_DIR=/tmp/PMOS_ROOT
-          mkdir -p ${PMOS_ROOT_DIR}
-          
-          sudo mount -o loop $ROOT_IMG_PATH ${PMOS_ROOT_DIR}
-          cd ${PMOS_ROOT_DIR}
-          
-          sudo tar -cf $GITHUB_WORKSPACE/out/Spacewar_pmos.tar.xz --use-compress-program='xz -6 -T0' *
-          
-          cd $GITHUB_WORKSPACE 
-          
-          sudo umount ${PMOS_ROOT_DIR}
-          cp $BOOT_IMG_PATH $GITHUB_WORKSPACE/out/boot-nothing-spacewar.img
-
-          echo "y" | pmbootstrap shutdown
-          yes | pmbootstrap zap -hc
-          echo "Stowaway Build Complete!"
+          cp /home/runner/spacewar-pmos-dualboot/spacewar-pmos-dualboot/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
+          pmbootstrap install --password 9229 --split
+          pmbootstrap export --no-install
+          mkdir /tmp/PMOS_ROOT
+          sudo mount -o loop /tmp/postmarketOS-export/*-root.img /tmp/PMOS_ROOT
+          sudo mount -o loop /tmp/postmarketOS-export/*-boot.img /tmp/PMOS_ROOT/boot/
+          cd /tmp/PMOS_ROOT
+          echo "deviceinfo_kernel_cmdline_append=\"pmos.stowaway pmos_root=/dev/sda11\"" | sudo tee -a etc/deviceinfo
+          sudo sed -i '3,0s/^/#/' etc/fstab
+          sudo tar -cf ../pmos.tar *
+          cd /tmp
+          sudo umount /tmp/PMOS_ROOT/boot/
+          sudo umount /tmp/PMOS_ROOT/
+          cp /tmp/postmarketOS-export/boot.img /tmp/out/boot-nothing-spacewar.img
+          cp /tmp/pmos.tar /tmp/out/pmos.tar
+          cd /tmp/out/
+          tar -cJf nothing-spacewar-plasma-dualboot.tar.xz boot-nothing-spacewar.img pmos.tar
+          echo -e "n\nn\ny\n" | pmbootstrap zap
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.DEVICE_NAME }}-stowaway
-          path: out/*
+          name: nothing-spacewar-plasma-dualboot
+          path: /tmp/out/nothing-spacewar-plasma-dualboot.tar.xz
           retention-days: 7
