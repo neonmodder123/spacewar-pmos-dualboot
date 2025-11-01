@@ -21,8 +21,8 @@ jobs:
 
       - name: Configure git
         run: |
-          git config --global user.email "veythrix@gmail.com"
-          git config --global user.name "Veythrix"
+          git config --global user.email "example@example.com"
+          git config --global user.name "neonmodder123"
 
       - name: Substitute placeholders in configs
         run: |
@@ -57,7 +57,7 @@ jobs:
 
       - name: Choose nothing-spacewar device in pmbootstrap to build kernel
         run: |
-          cp /home/runner/spacewar-pmos-dualboot/spacewar-pmos-dualboot/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap_v3.cfg
+          cp /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualboot/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap_v3.cfg
 
       - name: Compile kernel with envkernel
         run: |
@@ -75,7 +75,7 @@ jobs:
 
       - name: Build nothing-spacewar
         run: |
-          cp /home/runner/spacewar-pmos-dualboot/spacewar-pmos-dualboot/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
+          cp /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualboot/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
           pmbootstrap install --password 9229 --split
           pmbootstrap export --no-install
           mkdir /tmp/PMOS_ROOT
