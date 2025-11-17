@@ -26,8 +26,8 @@ jobs:
       
       - name: Configure git
         run: |
-          git config --global user.email "veythrix@gmail.com"
-          git config --global user.name "Veythrix"
+          git config --global user.email "example@example.com"
+          git config --global user.name "neonmodder123"
 
       - name: Substitute placeholders in configs
         run: |
@@ -96,4 +96,5 @@ jobs:
           name: nothing-spacewar-phosh
           path: out/*-spacewar.img*
           retention-days: 7
+
 
