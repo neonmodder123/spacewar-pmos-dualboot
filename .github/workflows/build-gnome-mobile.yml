@@ -1,4 +1,4 @@
-name: Build weekly images (gnome-mobile)
+name: Build weekly (gnome-mobile)
 on:
   #push: Disable build on push for now
   workflow_dispatch:
@@ -19,10 +19,15 @@ jobs:
       - name: Check out build configurations
         uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y simg2img
+          
       - name: Configure git
         run: |
-          git config --global user.email "veythrix@gmail.com"
-          git config --global user.name "Veythrix"
+          git config --global user.email "example@example.com"
+          git config --global user.name "neonmodder123"
 
       - name: Substitute placeholders in configs
         run: |
@@ -68,7 +73,6 @@ jobs:
           make -j$(nproc)
           pmbootstrap build --envkernel linux-postmarketos-qcom-sc7280
 
-
       - name: Create artifact directory
         run: |
           mkdir out
@@ -81,6 +85,8 @@ jobs:
           cp /tmp/postmarketOS-export/boot.img out/boot-nothing-spacewar.img
           cp /tmp/postmarketOS-export/nothing-spacewar.img out/rootfs-nothing-spacewar.img
           xz -T0 -9e -v out/rootfs-nothing-spacewar.img
+          simg2img out/rootfs-nothing-spacewar.img out/rootfs-nothing-spacewar_raw.img
+          rm -rf out/rootfs-nothing-spacewar.img
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
       - name: Upload artifacts
