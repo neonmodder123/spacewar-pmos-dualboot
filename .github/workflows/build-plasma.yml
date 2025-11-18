@@ -19,10 +19,15 @@ jobs:
       - name: Check out build configurations
         uses: actions/checkout@v4
 
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+      
       - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y android-sdk-libsparse-utils
+          brew install simg2img
       
       - name: Configure git
         run: |
@@ -96,6 +101,7 @@ jobs:
           name: nothing-spacewar-plasma
           path: out/*-spacewar.img*
           retention-days: 7
+
 
 
 
