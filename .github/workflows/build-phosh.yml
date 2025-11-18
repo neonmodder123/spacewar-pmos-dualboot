@@ -73,7 +73,7 @@ jobs:
         uses: actions/cache@v3
         id: cache-kernel
         with:
-          path: ~/.local/var/cache_git/pmaports/linux
+          path: ~/.local/var/pmbootstrap/cache_git/pmaports/linux
           key: ${{ runner.os }}-postmarketOS-kernel-neonmodder123
           restore-keys: |
             ${{ runner.os }}-postmarketOS-kernel-neonmodder123-1-
@@ -107,3 +107,4 @@ jobs:
           name: nothing-spacewar-plasma
           path: out/*-spacewar*.img*
           retention-days: 7
+
