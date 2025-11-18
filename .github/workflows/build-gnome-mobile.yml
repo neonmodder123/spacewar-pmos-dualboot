@@ -94,7 +94,7 @@ jobs:
 
       - name: Build nothing-spacewar
         run: |
-          cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
+          cp nothing-spacewar.cfg ~/.config/pmbootstrap.cfg
           pmbootstrap install --password 9229
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-nothing-spacewar.img
