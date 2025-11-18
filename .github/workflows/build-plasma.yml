@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y simg2img
+          sudo apt install -y android-sdk-libsparse-utils
       
       - name: Configure git
         run: |
@@ -96,6 +96,7 @@ jobs:
           name: nothing-spacewar-plasma
           path: out/*-spacewar.img*
           retention-days: 7
+
 
 
 
