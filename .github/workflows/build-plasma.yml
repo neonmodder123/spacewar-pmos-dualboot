@@ -98,10 +98,7 @@ jobs:
           pmbootstrap install --password 9229
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-nothing-spacewar.img
-          cp /tmp/postmarketOS-export/nothing-spacewar.img out/rootfs-nothing-spacewar.img
-          xz -T0 -9e -v out/rootfs-nothing-spacewar.img
           simg2img /tmp/postmarketOS-export/nothing-spacewar.img out/rootfs-nothing-spacewar_raw.img
-          rm -rf out/rootfs-nothing-spacewar.img
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
       - name: Upload artifacts
@@ -110,9 +107,3 @@ jobs:
           name: nothing-spacewar-plasma
           path: out/*-spacewar.img*
           retention-days: 7
-
-
-
-
-
-
