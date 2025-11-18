@@ -104,8 +104,6 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: nothing-spacewar-phosh
-          path: out/*-spacewar.img*
+          name: nothing-spacewar-plasma
+          path: out/*-spacewar*.img*
           retention-days: 7
-
-
