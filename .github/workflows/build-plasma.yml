@@ -81,7 +81,7 @@ jobs:
       - name: Compile kernel with envkernel
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
-          cd linux
+          cd ~/linux
           shopt -s expand_aliases
           source ~/pmbootstrap/helpers/envkernel.sh
           make defconfig sc7280.config
@@ -108,4 +108,5 @@ jobs:
           name: nothing-spacewar-plasma
           path: out/*-spacewar*.img*
           retention-days: 7
+
 
