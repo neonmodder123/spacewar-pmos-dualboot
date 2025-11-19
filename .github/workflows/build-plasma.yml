@@ -40,7 +40,7 @@ jobs:
 
       - name: Install pmbootstrap from git
         run: |
-          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1
+          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git --depth 1 ~/pmbootstrap
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           pmbootstrap --version
@@ -63,17 +63,17 @@ jobs:
 
       - name: Clone kernel sources
         run: |
-          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1
+          git clone https://github.com/mainlining/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ~/linux
 
       - name: Choose nothing-spacewar device in pmbootstrap to build kernel
         run: |
-          cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap_v3.cfg
+          cp /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualboot/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap_v3.cfg
       
       - name: Cache kernel
         uses: actions/cache@v3
         id: cache-kernel
         with:
-          path: ~/.local/var/pmbootstrap/cache_git/pmaports/linux
+          path: ~/linux
           key: ${{ runner.os }}-postmarketOS-kernel-neonmodder123
           restore-keys: |
             ${{ runner.os }}-postmarketOS-kernel-neonmodder123-1-
@@ -83,18 +83,19 @@ jobs:
         run: |
           cd linux
           shopt -s expand_aliases
-          source ../pmbootstrap/helpers/envkernel.sh
+          source ~/pmbootstrap/helpers/envkernel.sh
           make defconfig sc7280.config
           make -j$(nproc)
           pmbootstrap build --envkernel linux-postmarketos-qcom-sc7280
 
       - name: Create artifact directory
         run: |
+          cd ~/.local/var/pmbootstrap/cache_git/pmaports
           mkdir out
 
       - name: Build nothing-spacewar
         run: |
-          cp nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
+          cp /home/runner/work/spacewar-pmos-dualboot/spacewar-pmos-dualboot/nothing-spacewar-plasma.cfg ~/.config/pmbootstrap.cfg
           pmbootstrap install --password 9229
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-nothing-spacewar.img
@@ -107,5 +108,3 @@ jobs:
           name: nothing-spacewar-plasma
           path: out/*-spacewar*.img*
           retention-days: 7
-
-
