@@ -90,7 +90,6 @@ jobs:
 
       - name: Create artifact directory
         run: |
-          cd ~/.local/var/pmbootstrap/cache_git/pmaports
           mkdir out
 
       - name: Build nothing-spacewar
