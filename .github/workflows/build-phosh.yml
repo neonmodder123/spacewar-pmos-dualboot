@@ -101,6 +101,10 @@ jobs:
           simg2img /tmp/postmarketOS-export/nothing-spacewar.img out/rootfs-nothing-spacewar_raw.img
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
+      - name: Compress to a zip for release
+        run: |
+          zip -r spacewar-pmos-phosh-dualboot.zip out/
+      
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -108,5 +112,12 @@ jobs:
           path: out/*-spacewar*.img*
           retention-days: 7
 
-
-
+      - name: Create Release!
+        uses: softprops/action-gh-release@v1
+        with:
+          files: spacewar-pmos-phosh-dualboot.zip
+          name: "phosh - postmarketOS dualboot image"
+          body: "postmarketOS dualboot image for phosh :)"
+          tag_name: phosh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
