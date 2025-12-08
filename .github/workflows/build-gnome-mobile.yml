@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y android-sdk-libsparse-utils
+          sudo apt install -y android-sdk-libsparse-utils zip
           brew install simg2img
           
       - name: Configure git
@@ -101,9 +101,23 @@ jobs:
           simg2img /tmp/postmarketOS-export/nothing-spacewar.img out/rootfs-nothing-spacewar_raw.img
           echo -e "n\nn\ny\n" | pmbootstrap zap
 
+      - name: Compress to a zip for release
+        run: |
+          zip -r spacewar-pmos-gnome-dualboot.zip out/
+          
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: nothing-spacewar-gnome
           path: out/*-spacewar*.img*
           retention-days: 7
+
+      - name: Create Release!
+        uses: softprops/action-gh-release@v1
+        with:
+          files: spacewar-pmos-gnome-dualboot.zip
+          name: "gnome - postmarketOS dualboot image"
+          body: "postmarketOS dualboot image for gnome-mobile :)"
+          tag_name: gnome
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
