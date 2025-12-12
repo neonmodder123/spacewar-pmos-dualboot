@@ -1,4 +1,4 @@
-## Dualboot test with postmarketOS and Android for the Nothing Phone 1 (Spacewar) :)
+## Attempt to dualboot postmarketOS and Android for the Nothing Phone 1 (Spacewar) :)
 
 ### How to install ?
 
@@ -6,4 +6,3 @@
 
 #### If one DE doesn't work well, just try another one...
 
-### Please note that only gnome-mobile is available at the moment. Will add more variants later.
